@@ -14,6 +14,7 @@
     display: block;  /* prevents scrollbar */
     width: 100vw;
     height: 100vh;
+    background-color: red;
   }
 </style>
 </head>
@@ -37,27 +38,27 @@ For more info see https://webgl2fundamentals.org/webgl/lessons/webgl-less-code-m
 
 var vs = `#version 300 es
 uniform mat4 u_worldViewProjection;
-uniform vec3 u_lightWorldPos;
+// uniform vec3 u_lightWorldPos;
 uniform mat4 u_world;
-uniform mat4 u_viewInverse;
-uniform mat4 u_worldInverseTranspose;
+// uniform mat4 u_viewInverse;
+// uniform mat4 u_worldInverseTranspose;
 
 in vec4 a_position;
-in vec3 a_normal;
+// in vec3 a_normal;
 in vec2 a_texcoord;
 
 out vec4 v_position;
 out vec2 v_texCoord;
-out vec3 v_normal;
-out vec3 v_surfaceToLight;
-out vec3 v_surfaceToView;
+// out vec3 v_normal;
+// out vec3 v_surfaceToLight;
+// out vec3 v_surfaceToView;
 
 void main() {
   v_texCoord = a_texcoord;
   v_position = (u_worldViewProjection * a_position);
-  v_normal = (u_worldInverseTranspose * vec4(a_normal, 0)).xyz;
-  v_surfaceToLight = u_lightWorldPos - (u_world * a_position).xyz;
-  v_surfaceToView = (u_viewInverse[3] - (u_world * a_position)).xyz;
+  // v_normal = (u_worldInverseTranspose * vec4(a_normal, 0)).xyz;
+  // v_surfaceToLight = u_lightWorldPos - (u_world * a_position).xyz;
+  // v_surfaceToView = (u_viewInverse[3] - (u_world * a_position)).xyz;
   gl_Position = v_position;
 }
 `;
@@ -67,38 +68,39 @@ precision highp float;
 
 in vec4 v_position;
 in vec2 v_texCoord;
-in vec3 v_normal;
-in vec3 v_surfaceToLight;
-in vec3 v_surfaceToView;
+// in vec3 v_normal;
+// in vec3 v_surfaceToLight;
+// in vec3 v_surfaceToView;
 
-uniform vec4 u_lightColor;
-uniform vec4 u_colorMult;
+// uniform vec4 u_lightColor;
+// uniform vec4 u_colorMult;
 uniform sampler2D u_diffuse;
-uniform vec4 u_specular;
-uniform float u_shininess;
-uniform float u_specularFactor;
+// uniform vec4 u_specular;
+// uniform float u_shininess;
+// uniform float u_specularFactor;
 
 out vec4 outColor;
 
-vec4 lit(float l ,float h, float m) {
-  return vec4(1.0,
-              abs(l),
-              (l > 0.0) ? pow(max(0.0, h), m) : 0.0,
-              1.0);
-}
+// vec4 lit(float l ,float h, float m) {
+//   return vec4(1.0,
+//               abs(l),
+//               (l > 0.0) ? pow(max(0.0, h), m) : 0.0,
+//               1.0);
+// }
 
 void main() {
   vec4 diffuseColor = texture(u_diffuse, v_texCoord);
-  vec3 a_normal = normalize(v_normal);
-  vec3 surfaceToLight = normalize(v_surfaceToLight);
-  vec3 surfaceToView = normalize(v_surfaceToView);
-  vec3 halfVector = normalize(surfaceToLight + surfaceToView);
-  vec4 litR = lit(dot(a_normal, surfaceToLight),
-                    dot(a_normal, halfVector), u_shininess);
-  outColor = vec4((
-    u_lightColor * (diffuseColor * litR.y * u_colorMult +
-                u_specular * litR.z * u_specularFactor)).rgb,
-      diffuseColor.a);
+  // vec3 a_normal = normalize(v_normal);
+  // vec3 surfaceToLight = normalize(v_surfaceToLight);
+  // vec3 surfaceToView = normalize(v_surfaceToView);
+  // vec3 halfVector = normalize(surfaceToLight + surfaceToView);
+  // vec4 litR = lit(dot(a_normal, surfaceToLight),
+  //                   dot(a_normal, halfVector), u_shininess);
+  // outColor = vec4((
+  //   u_lightColor * (diffuseColor * litR.y * u_colorMult +
+  //               u_specular * litR.z * u_specularFactor)).rgb,
+  //     diffuseColor.a);
+  outColor = diffuseColor;
 }
 `;
 
@@ -106,10 +108,21 @@ function main() {
   // Get A WebGL context
   /** @type {HTMLCanvasElement} */
   var canvas = document.querySelector("#canvas");
-  var gl = canvas.getContext("webgl2");
+
+  // No alpha in the backbuffer: see https://webglfundamentals.org/webgl/lessons/webgl-and-alpha.html.
+  //
+  var gl = canvas.getContext("webgl2", {alpha: false});
   if (!gl) {
     return;
   }
+  // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  // gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  // gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+
+  // gl.enable(gl.GL_DEPTH_TEST);
+  // gl.depthFunc(gl.GL_LEQUAL);
+  // gl.enable(gl.GL_BLEND);
+  // gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA);
 
   // Tell the twgl to match position with a_position, n
   // normal with a_normal etc..
@@ -119,13 +132,16 @@ function main() {
   var arrays = {
      position: { numComponents: 3, data: [0, 0, 0, 10, 0, 0, 0, 10, 0, 10, 10, 0], },
      texcoord: { numComponents: 2, data: [0, 0, 0, 1, 1, 0, 1, 1],                 },
-     normal:   { numComponents: 3, data: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],     },
+    //  normal:   { numComponents: 3, data: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],     },
      indices:  { numComponents: 3, data: [0, 1, 2, 1, 2, 3],                       },
   };
   var bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
 
   // setup GLSL program
-  var program = twgl.createProgramFromSources(gl, [vs, fs]);
+  var program = twgl.createProgramFromSources(gl, [vs, fs], {}, {}, (e)=>console.log(e));
+  // if (!program) {
+  //   console.error('SHADER!');
+  // }
   var uniformSetters = twgl.createUniformSetters(gl, program);
   var attribSetters  = twgl.createAttributeSetters(gl, program);
 
@@ -138,11 +154,11 @@ function main() {
 
   var fieldOfViewRadians = degToRad(60);
 
-  var uniformsThatAreTheSameForAllObjects = {
-    u_lightWorldPos:         [-50, 30, 100],
-    u_viewInverse:           m4.identity(),
-    u_lightColor:            [1, 1, 1, 1],
-  };
+  // var uniformsThatAreTheSameForAllObjects = {
+  //   u_lightWorldPos:         [-50, 30, 100],
+  //   u_viewInverse:           m4.identity(),
+  //   u_lightColor:            [1, 1, 1, 1],
+  // };
 
   var uniformsThatAreComputedForEachObject = {
     u_worldViewProjection:   m4.identity(),
@@ -163,9 +179,10 @@ function main() {
   };
 
   var textures = [
-    textureUtils.makeStripeTexture(gl, { color1: "#FFF", color2: "#CCC", }),
-    textureUtils.makeCheckerTexture(gl, { color1: "#FFF", color2: "#CCC", }),
-    textureUtils.makeCircleTexture(gl, { color1: "#FFF", color2: "#CCC", }),
+    textureUtils.makeStripeTexture(gl, { color1: "#700", color2: "#F00", }),
+    textureUtils.makeCheckerTexture(gl, { color1: "#070", color2: "#0F0", }),
+    textureUtils.makeCircleTexture(gl, { color1: '#00F0', color2: "#00F", }),
+    // textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,0,0,0)', color2: "#CCC", }),
   ];
 
   var objects = [];
@@ -173,15 +190,15 @@ function main() {
   var baseColor = rand(240);
   for (var ii = 0; ii < numObjects; ++ii) {
     objects.push({
-      radius: rand(150),
+      radius: rand(numObjects/2),
       xRotation: rand(Math.PI * 2),
       yRotation: rand(Math.PI),
       materialUniforms: {
-        u_colorMult:             chroma.hsv(rand(baseColor, baseColor + 120), 0.5, 1).gl(),
+        // u_colorMult:             chroma.hsv(rand(baseColor, baseColor + 120), 0.5, 1).gl(),
         u_diffuse:               textures[randInt(textures.length)],
-        u_specular:              [1, 1, 1, 1],
-        u_shininess:             rand(500),
-        u_specularFactor:        rand(1),
+        // u_specular:              [1, 1, 1, 1],
+        // u_shininess:             rand(500),
+        // u_specularFactor:        rand(1),
       },
     });
   }
@@ -197,7 +214,7 @@ function main() {
     // Tell WebGL how to convert from clip space to pixels
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-    gl.enable(gl.DEPTH_TEST);
+    // gl.enable(gl.DEPTH_TEST);
 
     // Compute the projection matrix
     var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
@@ -205,10 +222,12 @@ function main() {
         m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
 
     // Compute the camera's matrix using look at.
-    var cameraPosition = [0, 0, 100];
+    const camDist = 100;
+    // const camDist = numObjects/2;
+    var cameraPosition = [0, 0, camDist];
     var target = [0, 0, 0];
     var up = [0, 1, 0];
-    var cameraMatrix = m4.lookAt(cameraPosition, target, up, uniformsThatAreTheSameForAllObjects.u_viewInverse);
+    var cameraMatrix = m4.lookAt(cameraPosition, target, up);//, uniformsThatAreTheSameForAllObjects.u_viewInverse);
 
     // Make a view matrix from the camera matrix.
     var viewMatrix = m4.inverse(cameraMatrix);
@@ -220,8 +239,8 @@ function main() {
     // Setup all the needed attributes.
     gl.bindVertexArray(vao);
 
-    // Set the uniforms that are the same for all objects.
-    twgl.setUniforms(uniformSetters, uniformsThatAreTheSameForAllObjects);
+    // // Set the uniforms that are the same for all objects.
+    // twgl.setUniforms(uniformSetters, uniformsThatAreTheSameForAllObjects);
 
     // Draw objects
     objects.forEach(function(object) {
