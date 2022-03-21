@@ -39,7 +39,7 @@ For more info see https://webgl2fundamentals.org/webgl/lessons/webgl-less-code-m
 var vs = `#version 300 es
 uniform mat4 u_worldViewProjection;
 // uniform vec3 u_lightWorldPos;
-uniform mat4 u_world;
+// uniform mat4 u_world;
 // uniform mat4 u_viewInverse;
 // uniform mat4 u_worldInverseTranspose;
 
@@ -47,7 +47,7 @@ in vec4 a_position;
 // in vec3 a_normal;
 in vec2 a_texcoord;
 
-out vec4 v_position;
+// out vec4 v_position;
 out vec2 v_texCoord;
 // out vec3 v_normal;
 // out vec3 v_surfaceToLight;
@@ -55,7 +55,7 @@ out vec2 v_texCoord;
 
 void main() {
   v_texCoord = a_texcoord;
-  v_position = (u_worldViewProjection * a_position);
+  vec4 v_position = (u_worldViewProjection * a_position);
   // v_normal = (u_worldInverseTranspose * vec4(a_normal, 0)).xyz;
   // v_surfaceToLight = u_lightWorldPos - (u_world * a_position).xyz;
   // v_surfaceToView = (u_viewInverse[3] - (u_world * a_position)).xyz;
@@ -66,7 +66,7 @@ void main() {
 var fs = `#version 300 es
 precision highp float;
 
-in vec4 v_position;
+// in vec4 v_position;
 in vec2 v_texCoord;
 // in vec3 v_normal;
 // in vec3 v_surfaceToLight;
@@ -100,6 +100,7 @@ void main() {
   //   u_lightColor * (diffuseColor * litR.y * u_colorMult +
   //               u_specular * litR.z * u_specularFactor)).rgb,
   //     diffuseColor.a);
+
   if (diffuseColor.a==0.0) {
     discard;
   }
@@ -142,9 +143,6 @@ function main() {
 
   // setup GLSL program
   var program = twgl.createProgramFromSources(gl, [vs, fs], {}, {}, (e)=>console.log(e));
-  // if (!program) {
-  //   console.error('SHADER!');
-  // }
   var uniformSetters = twgl.createUniformSetters(gl, program);
   var attribSetters  = twgl.createAttributeSetters(gl, program);
 
@@ -158,9 +156,9 @@ function main() {
   var fieldOfViewRadians = degToRad(60);
 
   // var uniformsThatAreTheSameForAllObjects = {
-  //   u_lightWorldPos:         [-50, 30, 100],
-  //   u_viewInverse:           m4.identity(),
-  //   u_lightColor:            [1, 1, 1, 1],
+  // //   u_lightWorldPos:         [-50, 30, 100],
+  // // u_viewInverse:           m4.identity(),
+  // //   u_lightColor:            [1, 1, 1, 1],
   // };
 
   var uniformsThatAreComputedForEachObject = {
@@ -184,7 +182,7 @@ function main() {
   var textures = [
     textureUtils.makeStripeTexture(gl, { color1: "#700", color2: "#F00", }),
     textureUtils.makeCheckerTexture(gl, { color1: "#070", color2: "#0F0", }),
-    textureUtils.makeCircleTexture(gl, { color1: '#00F0', color2: '#00F', }),
+    textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,255,255,0.0)', color2: '#00F', }),
     // textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,0,0,0)', color2: "#CCC", }),
   ];
 
