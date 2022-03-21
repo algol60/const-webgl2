@@ -1,0 +1,238 @@
+<!-- Licensed under a BSD license. See license.html for license -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title addtitledoc=""false">WebGL2 - Less Code More Fun</title>
+<!-- <link type="text/css" href="resources/webgl-tutorials.css" rel="stylesheet" /> -->
+<style>
+  body {
+    margin: 0;
+  }
+  canvas {
+    display: block;  /* prevents scrollbar */
+    width: 100vw;
+    height: 100vh;
+    background-color: red;
+  }
+</style>
+</head>
+<body>
+<!-- <div class="description">
+Uses a few utility functions so there's much less code.
+</div> -->
+<canvas id="canvas"></canvas>
+</body>
+<!--
+This sample uses TWGL (Tiny WebGL) to hide the clutter.
+Otherwise the sample would be full of code not related to the point of the sample.
+For more info see https://webgl2fundamentals.org/webgl/lessons/webgl-less-code-more-fun.html
+-->
+<script src="resources/twgl-full.min.js"></script>
+<script src="resources/m4.js"></script>
+<script src="resources/texture-utils.js"></script>
+<script src="resources/chroma.min.js"></script>
+<script>
+"use strict";
+
+var vs = `#version 300 es
+uniform mat4 u_worldViewProjection;
+
+in vec4 a_position;
+in vec2 a_texcoord;
+
+out vec2 v_texCoord;
+
+void main() {
+  v_texCoord = a_texcoord;
+  vec4 v_position = (u_worldViewProjection * a_position);
+  gl_Position = v_position;
+}
+`;
+
+var fs = `#version 300 es
+precision highp float;
+
+in vec2 v_texCoord;
+
+uniform sampler2D u_diffuse;
+
+out vec4 outColor;
+
+void main() {
+  vec4 diffuseColor = texture(u_diffuse, v_texCoord);
+  if (diffuseColor.a==0.0) {
+    discard;
+  }
+  outColor = diffuseColor;
+}
+`;
+
+function main() {
+  // Get A WebGL context
+  /** @type {HTMLCanvasElement} */
+  var canvas = document.querySelector("#canvas");
+
+  // No alpha in the backbuffer: see https://webglfundamentals.org/webgl/lessons/webgl-and-alpha.html.
+  //
+  var gl = canvas.getContext("webgl2", {alpha: false});
+  if (!gl) {
+    return;
+  }
+  // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  // gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  // gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+
+  // gl.enable(gl.GL_DEPTH_TEST);
+  // gl.depthFunc(gl.GL_LEQUAL);
+  // gl.enable(gl.GL_BLEND);
+  // gl.blendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA);
+
+  // Tell the twgl to match position with a_position, n
+  // normal with a_normal etc..
+  twgl.setAttributePrefix("a_");
+
+  // an indexed quad
+  var arrays = {
+     position: { numComponents: 3, data: [0, 0, 0, 10, 0, 0, 0, 10, 0, 10, 10, 0], },
+     texcoord: { numComponents: 2, data: [0, 0, 0, 1, 1, 0, 1, 1],                 },
+    //  normal:   { numComponents: 3, data: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],     },
+     indices:  { numComponents: 3, data: [0, 1, 2, 1, 2, 3],                       },
+  };
+  var bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
+
+  // setup GLSL program
+  var program = twgl.createProgramFromSources(gl, [vs, fs]);//, {}, {}, (e)=>console.log(e));
+  var uniformSetters = twgl.createUniformSetters(gl, program);
+  var attribSetters  = twgl.createAttributeSetters(gl, program);
+
+  var vao = twgl.createVAOFromBufferInfo(
+      gl, attribSetters, bufferInfo);
+
+  function degToRad(d) {
+    return d * Math.PI / 180;
+  }
+
+  var fieldOfViewRadians = degToRad(60);
+
+  // var uniformsThatAreTheSameForAllObjects = {
+  // //   u_lightWorldPos:         [-50, 30, 100],
+  // // u_viewInverse:           m4.identity(),
+  // //   u_lightColor:            [1, 1, 1, 1],
+  // };
+
+  var uniformsThatAreComputedForEachObject = {
+    u_worldViewProjection:   m4.identity(),
+    u_world:                 m4.identity(),
+    u_worldInverseTranspose: m4.identity(),
+  };
+
+  var rand = function(min, max) {
+    if (max === undefined) {
+      max = min;
+      min = 0;
+    }
+    return min + Math.random() * (max - min);
+  };
+
+  var randInt = function(range) {
+    return Math.floor(Math.random() * range);
+  };
+
+  var textures = [
+    textureUtils.makeStripeTexture(gl, { color1: "#700", color2: "#F00", }),
+    textureUtils.makeCheckerTexture(gl, { color1: "#070", color2: "#0F0", }),
+    textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,255,255,0.0)', color2: '#00F', }),
+    // textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,0,0,0)', color2: "#CCC", }),
+  ];
+
+  var objects = [];
+  var numObjects = 300;
+  var baseColor = rand(240);
+  for (var ii = 0; ii < numObjects; ++ii) {
+    objects.push({
+      radius: rand(numObjects/2),
+      xRotation: rand(Math.PI * 2),
+      yRotation: rand(Math.PI),
+      materialUniforms: {
+        // u_colorMult:             chroma.hsv(rand(baseColor, baseColor + 120), 0.5, 1).gl(),
+        u_diffuse:               textures[randInt(textures.length)],
+        // u_specular:              [1, 1, 1, 1],
+        // u_shininess:             rand(500),
+        // u_specularFactor:        rand(1),
+      },
+    });
+  }
+
+  requestAnimationFrame(drawScene);
+
+  // Draw the scene.
+  function drawScene(time) {
+    time = 5 + time * 0.0001;
+
+    twgl.resizeCanvasToDisplaySize(gl.canvas);
+
+    // Tell WebGL how to convert from clip space to pixels
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+    // gl.enable(gl.DEPTH_TEST);
+
+    // Compute the projection matrix
+    var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    var projectionMatrix =
+        m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
+
+    // Compute the camera's matrix using look at.
+    const camDist = 100;
+    var cameraPosition = [0, 0, camDist];
+    var target = [0, 0, 0];
+    var up = [0, 1, 0];
+    var cameraMatrix = m4.lookAt(cameraPosition, target, up);//, uniformsThatAreTheSameForAllObjects.u_viewInverse);
+
+    // Make a view matrix from the camera matrix.
+    var viewMatrix = m4.inverse(cameraMatrix);
+
+    var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+
+    gl.useProgram(program);
+
+    // Setup all the needed attributes.
+    gl.bindVertexArray(vao);
+
+    // // Set the uniforms that are the same for all objects.
+    // twgl.setUniforms(uniformSetters, uniformsThatAreTheSameForAllObjects);
+
+    // Draw objects
+    objects.forEach(function(object) {
+
+      // Compute a position for this object based on the time.
+      var worldMatrix = m4.identity();
+      worldMatrix = m4.yRotate(worldMatrix, object.yRotation * time);
+      worldMatrix = m4.xRotate(worldMatrix, object.xRotation * time);
+      worldMatrix = m4.translate(worldMatrix, 0, 0, object.radius,
+         uniformsThatAreComputedForEachObject.u_world);
+
+      // Multiply the matrices.
+      m4.multiply(viewProjectionMatrix, worldMatrix, uniformsThatAreComputedForEachObject.u_worldViewProjection);
+      m4.transpose(m4.inverse(worldMatrix), uniformsThatAreComputedForEachObject.u_worldInverseTranspose);
+
+      // Set the uniforms we just computed
+      twgl.setUniforms(uniformSetters, uniformsThatAreComputedForEachObject);
+
+      // Set the uniforms that are specific to the this object.
+      twgl.setUniforms(uniformSetters, object.materialUniforms);
+
+      // Draw the geometry.
+      gl.drawElements(gl.TRIANGLES, bufferInfo.numElements, gl.UNSIGNED_SHORT, 0);
+    });
+
+    requestAnimationFrame(drawScene);
+  }
+}
+
+main();
+</script>
+</html>
+
+
