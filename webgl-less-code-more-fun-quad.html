@@ -100,6 +100,9 @@ void main() {
   //   u_lightColor * (diffuseColor * litR.y * u_colorMult +
   //               u_specular * litR.z * u_specularFactor)).rgb,
   //     diffuseColor.a);
+  if (diffuseColor.a==0.0) {
+    discard;
+  }
   outColor = diffuseColor;
 }
 `;
@@ -181,7 +184,7 @@ function main() {
   var textures = [
     textureUtils.makeStripeTexture(gl, { color1: "#700", color2: "#F00", }),
     textureUtils.makeCheckerTexture(gl, { color1: "#070", color2: "#0F0", }),
-    textureUtils.makeCircleTexture(gl, { color1: '#00F0', color2: "#00F", }),
+    textureUtils.makeCircleTexture(gl, { color1: '#00F0', color2: '#00F', }),
     // textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,0,0,0)', color2: "#CCC", }),
   ];
 
@@ -223,7 +226,6 @@ function main() {
 
     // Compute the camera's matrix using look at.
     const camDist = 100;
-    // const camDist = numObjects/2;
     var cameraPosition = [0, 0, camDist];
     var target = [0, 0, 0];
     var up = [0, 1, 0];
