@@ -41,16 +41,13 @@ uniform mat4 u_worldViewProjection;
 in vec4 a_position;
 in vec2 a_texcoord;
 in float a_image;
-flat out float v_image;
 
 out vec2 v_texCoord;
 
 void main() {
-  v_image = a_image;
-
   v_texCoord = a_texcoord;
-  vec4 v_position = (u_worldViewProjection * a_position);
-  gl_Position = v_position;
+
+  gl_Position = (u_worldViewProjection * a_position);
 }
 `;
 
@@ -59,28 +56,17 @@ precision highp float;
 
 in vec2 v_texCoord;
 
-// uniform sampler2D u_diffuse;
-flat in float v_image;
+uniform sampler2D u_diffuse;
 
 out vec4 outColor;
 
 void main() {
-  // vec4 diffuseColor = texture(u_diffuse, v_texCoord);
+  vec4 diffuseColor = texture(u_diffuse, v_texCoord);
 
-  // if (diffuseColor.a==0.0) {
-  //   discard;
-  // }
-  // outColor = diffuseColor;
-
-  if (v_image==0.0) {
-    outColor = vec4(1,0,0,1);
-  } else if (v_image==1.0) {
-    outColor = vec4(0,1,0,0.5);
-  } else if (v_image==2.0) {
-    outColor = vec4(0,0,1,1);
-  } else {
-    outColor = vec4(1,1,1,1);
+  if (diffuseColor.a<0.1) {
+    discard;
   }
+  outColor = diffuseColor;
 }
 `;
 
@@ -97,19 +83,28 @@ void main() {
       return Math.floor(Math.random() * range);
     };
 
-    const numObjects = 100;
-    console.log(`numObjects: ${numObjects}`);
     const pos = [];
     const img = [];
-    // const tex = [];
+    const tex = [];
     // const ind = [];
 
-    const nradius = 10;
-    for (let i = 0; i < numObjects; i++) {
-      const objRadius = nradius * Math.sqrt(numObjects);
-      const x = rand(objRadius) - objRadius/2;
-      const y = rand(objRadius) - objRadius/2;
-      const z = rand(objRadius) - objRadius/2;
+    // How many nodes to draw?
+    //
+    const nNodes = 100;
+    console.log(`nNodes: ${nNodes}`);
+
+    // How big are the nodes?
+    //
+    const ndiam = 10;
+
+    // How big is the volume we draw the nodes in?
+    //
+    const volDiam = ndiam/2 * Math.sqrt(nNodes);
+    console.log(`Volume diameter: ${volDiam}`);
+    for (let i = 0; i < nNodes; i++) {
+      const x = rand(volDiam) - volDiam/2;
+      const y = rand(volDiam) - volDiam/2;
+      const z = rand(volDiam) - volDiam/2;
 
       // pos.push(x, y, z,  x + 10, y, z,  x, y + 10, z,  x + 10, y + 10, z);
       // const c = i%3;
@@ -118,13 +113,20 @@ void main() {
       // tex.push(0, 0, 0, 1, 1, 0, 1, 1);
       // ind.push(0, 1, 2, 1, 2, 3);
 
-      pos.push(x, y, z,  x + nradius, y, z,  x, y + nradius, z,
-                         x + nradius, y, z,  x, y + nradius, z,  x + nradius, y + nradius, z);
+      pos.push(x, y, z,  x + ndiam, y, z,  x, y + ndiam, z,
+                         x + ndiam, y, z,  x, y + ndiam, z,  x + ndiam, y + ndiam, z);
       const c = i%3;
       img.push(c, c, c, c, c, c);
       // img.push(2,2,2,2);
-      // tex.push(0, 0, 0, 1, 1, 0,
-                    //  0, 1, 1, 0, 1, 1);
+
+      // The texture atlas has 4 images arranged horizontally.
+      //
+      const texx0 = (i%4) / 4;
+      const texx1 = texx0 + 0.25;
+      // tex.push(1,1, 0,1, 1,0,
+      //               0,1, 1,0, 0,0);
+      tex.push(texx1,1, texx0,1, texx1,0,
+                    texx0,1, texx1,0, texx0,0);
       // ind.push(0, 1, 2, 1, 2, 3);
 
     }
@@ -154,7 +156,7 @@ void main() {
     const arrays = {
       position: {numComponents:3, data:pos},
       image:    {numComponents:1, data:img},
-      // texcoord: {numComponents:2, data:tex},
+      texcoord: {numComponents:2, data:tex},
       // indices:  {numComponents:3, data:ind},
     }
     const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
@@ -173,9 +175,11 @@ void main() {
 
     const fieldOfViewRadians = degToRad(60);
 
+    const atlas = textureUtils.loadTexture(gl, 'icons/_atlas.png');
     const uniformsThatAreTheSameForAllObjects = {
       u_worldViewProjection: m4.identity(),
       u_viewInverse:           m4.identity(),
+      u_diffuse: atlas
     };
 
     // var uniformsThatAreComputedForEachObject = {
@@ -191,22 +195,10 @@ void main() {
       // textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,0,0,0)', color2: "#CCC", }),
     ];
 
-    // const objects = [];
-    // for (var ii = 0; ii < 1; ++ii) {
-    //   objects.push({
-    //     radius: 0,//rand(numObjects / 2),
-    //     xRotation: rand(Math.PI * 2),
-    //     yRotation: rand(Math.PI),
-    //     // materialUniforms: {
-    //     //   // u_diffuse:               textures[randInt(textures.length)],
-    //     //   u_diffuse: textures[ii % textures.length],
-    //     // },
-    //   });
-    // }
-
-    // Compute the camera's matrix using look at.
+    // Set up to compute the camera's matrix using look at.
     //
-    const camDist = 200;
+    const camDist = volDiam * 0.9;
+    console.log(`Camera distance: ${camDist}`);
     const cameraPosition = [0, 0, camDist];
     const target = [0, 0, 0];
     const up = [0, 1, 0];
@@ -215,7 +207,7 @@ void main() {
 
     // Draw the scene.
     function drawScene(time) {
-      time = 5 + time * 0.001;
+      time = time * 0.001;
 
       twgl.resizeCanvasToDisplaySize(gl.canvas);
 
@@ -230,10 +222,6 @@ void main() {
         m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
 
       // // Compute the camera's matrix using look at.
-      // const camDist = 200;
-      // var cameraPosition = [0, 0, camDist];
-      // var target = [0, 0, 0];
-      // var up = [0, 1, 0];
       cameraPosition[0] = Math.sin(time) * camDist;
       cameraPosition[2] = Math.cos(time) * camDist;
       const cameraMatrix = m4.lookAt(cameraPosition, target, up, uniformsThatAreTheSameForAllObjects.u_viewInverse);
