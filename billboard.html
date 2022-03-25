@@ -37,16 +37,31 @@ For more info see https://webgl2fundamentals.org/webgl/lessons/webgl-less-code-m
 "use strict";
 
 var vs = `#version 300 es
+uniform mat4 u_world;
 uniform mat4 u_worldViewProjection;
+uniform mat4 u_perspective;
+uniform mat4 u_viewInverse;
 
 in vec4 a_position;
+in vec2 a_corners;
 in vec2 a_texcoord;
 
 out vec2 v_texCoord;
 
 void main() {
   v_texCoord = a_texcoord;
-  vec4 v_position = (u_worldViewProjection * a_position);
+  float size = 5.0;
+
+  // Billboard.
+  //
+  vec4 position = a_position;//vec4(u_world[0][1], u_world[0][1], u_world[0][2], u_world[0][3]);
+  position.xy += a_corners;
+  vec3 cameraRight = vec3(u_viewInverse[0].x, u_viewInverse[1].x, u_viewInverse[2].x);
+  vec3 cameraUp = vec3(u_viewInverse[0].y, u_viewInverse[1].y, u_viewInverse[2].y);
+  position.xyz += (cameraRight * a_corners.x * size) + (cameraUp * a_corners.y * size);
+  vec4 v_position = (u_worldViewProjection * u_viewInverse * position);
+
+  // vec4 v_position = (u_worldViewProjection * a_position);
   gl_Position = v_position;
 }
 `;
@@ -95,15 +110,18 @@ function main() {
 
   // an indexed quad
   var arrays = {
-     position: { numComponents: 3, data: [0, 0, 0, 10, 0, 0, 0, 10, 0, 10, 10, 0], },
-     texcoord: { numComponents: 2, data: [0, 0, 0, 1, 1, 0, 1, 1],                 },
+     position: { numComponents: 3, data: [0, 0, 0,  10, 0, 0,  0, 10, 0,  10, 10, 0]},
+    //  position: { numComponents: 3, data: [0, 0, 0,  0, 0, 0,  0, 0, 0,  0, 0, 0]},
+     corners:  { numComponents: 2, data: [-1.0, -1.0,  1.0, -1.0,  -1.0, 1.0,  1.0, 1.0]},
+     texcoord: { numComponents: 2, data: [0, 0,  1, 0,  0, 1,  1, 1]},
     //  normal:   { numComponents: 3, data: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],     },
-     indices:  { numComponents: 3, data: [0, 1, 2, 1, 2, 3],                       },
+     indices:  { numComponents: 3, data: [0, 1, 2,  1, 2, 3]},
   };
   var bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
+  console.log(`bufferInfo.numElements:${bufferInfo.numElements}`);
 
   // setup GLSL program
-  var program = twgl.createProgramFromSources(gl, [vs, fs]);//, {}, {}, (e)=>console.log(e));
+  var program = twgl.createProgramFromSources(gl, [vs, fs]);
   var uniformSetters = twgl.createUniformSetters(gl, program);
   var attribSetters  = twgl.createAttributeSetters(gl, program);
 
@@ -116,11 +134,12 @@ function main() {
 
   var fieldOfViewRadians = degToRad(60);
 
-  // var uniformsThatAreTheSameForAllObjects = {
-  // //   u_lightWorldPos:         [-50, 30, 100],
-  // // u_viewInverse:           m4.identity(),
-  // //   u_lightColor:            [1, 1, 1, 1],
-  // };
+  var uniformsThatAreTheSameForAllObjects = {
+  // u_lightWorldPos:         [-50, 30, 100],
+  u_viewInverse:           m4.identity(),
+  // u_lightColor:            [1, 1, 1, 1],
+  u_perspective: m4.identity(),
+  };
 
   var uniformsThatAreComputedForEachObject = {
     u_worldViewProjection:   m4.identity(),
@@ -156,11 +175,8 @@ function main() {
       xRotation: rand(Math.PI * 2),
       yRotation: rand(Math.PI),
       materialUniforms: {
-        // u_colorMult:             chroma.hsv(rand(baseColor, baseColor + 120), 0.5, 1).gl(),
-        u_diffuse:               textures[randInt(textures.length)],
-        // u_specular:              [1, 1, 1, 1],
-        // u_shininess:             rand(500),
-        // u_specularFactor:        rand(1),
+        // u_diffuse:               textures[randInt(textures.length)],
+        u_diffuse:               textures[ii % textures.length],
       },
     });
   }
@@ -181,7 +197,7 @@ function main() {
     // Compute the projection matrix
     var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     var projectionMatrix =
-        m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
+        m4.perspective(fieldOfViewRadians, aspect, 1, 2000, uniformsThatAreTheSameForAllObjects.u_perspective);
 
     // Compute the camera's matrix using look at.
     const camDist = 100;
@@ -192,6 +208,7 @@ function main() {
 
     // Make a view matrix from the camera matrix.
     var viewMatrix = m4.inverse(cameraMatrix);
+    uniformsThatAreTheSameForAllObjects.u_viewInverse = viewMatrix;
 
     var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
@@ -200,8 +217,8 @@ function main() {
     // Setup all the needed attributes.
     gl.bindVertexArray(vao);
 
-    // // Set the uniforms that are the same for all objects.
-    // twgl.setUniforms(uniformSetters, uniformsThatAreTheSameForAllObjects);
+    // Set the uniforms that are the same for all objects.
+    twgl.setUniforms(uniformSetters, uniformsThatAreTheSameForAllObjects);
 
     // Draw objects
     objects.forEach(function(object) {
@@ -234,5 +251,3 @@ function main() {
 main();
 </script>
 </html>
-
-

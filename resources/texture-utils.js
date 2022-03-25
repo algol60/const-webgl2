@@ -64,6 +64,9 @@ var makeStripeTexture = function(gl, options) {
   ctx.fillStyle = color2 || "black";
   ctx.fillRect(0, 0, width, height / 2);
 
+  ctx.fillStyle = "white";
+  ctx.fillRect(width/4, height*3/4, width/2, height/4);
+
   return makeTexture(gl);
 };
 

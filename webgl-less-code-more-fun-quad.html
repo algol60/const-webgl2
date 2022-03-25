@@ -142,7 +142,7 @@ function main() {
   var bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
 
   // setup GLSL program
-  var program = twgl.createProgramFromSources(gl, [vs, fs], {}, {}, (e)=>console.log(e));
+  var program = twgl.createProgramFromSources(gl, [vs, fs]);
   var uniformSetters = twgl.createUniformSetters(gl, program);
   var attribSetters  = twgl.createAttributeSetters(gl, program);
 
@@ -180,7 +180,7 @@ function main() {
   };
 
   var textures = [
-    textureUtils.makeStripeTexture(gl, { color1: "#700", color2: "#F00", }),
+    textureUtils.makeStripeTexture(gl, { color1: "#F00", color2: "#700", }),
     textureUtils.makeCheckerTexture(gl, { color1: "#070", color2: "#0F0", }),
     textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,255,255,0.0)', color2: '#00F', }),
     // textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,0,0,0)', color2: "#CCC", }),
@@ -188,6 +188,7 @@ function main() {
 
   var objects = [];
   var numObjects = 300;
+  console.log(`numObjects: ${numObjects}`);
   var baseColor = rand(240);
   for (var ii = 0; ii < numObjects; ++ii) {
     objects.push({
@@ -196,7 +197,8 @@ function main() {
       yRotation: rand(Math.PI),
       materialUniforms: {
         // u_colorMult:             chroma.hsv(rand(baseColor, baseColor + 120), 0.5, 1).gl(),
-        u_diffuse:               textures[randInt(textures.length)],
+        // u_diffuse:               textures[randInt(textures.length)],
+        u_diffuse:               textures[ii % textures.length],
         // u_specular:              [1, 1, 1, 1],
         // u_shininess:             rand(500),
         // u_specularFactor:        rand(1),
