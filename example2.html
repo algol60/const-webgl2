@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html>
+  <!-- Add billboarding. -->
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title addtitledoc="" false>WebGL2 example1</title>
+  <title addtitledoc="" false>WebGL2 example2 - billboarding</title>
   <link rel="icon" href="favicon-16x16.png">
   <!-- <link type="text/css" href="resources/webgl-tutorials.css" rel="stylesheet" /> -->
   <style>
@@ -37,8 +38,10 @@
 
   const vs = `#version 300 es
 uniform mat4 u_worldViewProjection;
+uniform mat4 u_viewInverse;
 
 in vec4 a_position;
+in vec2 a_corners;
 in vec2 a_texcoord;
 
 out vec2 v_texCoord;
@@ -46,7 +49,15 @@ out vec2 v_texCoord;
 void main() {
   v_texCoord = a_texcoord;
 
-  gl_Position = (u_worldViewProjection * a_position);
+  vec4 position = a_position;
+  // position.xy += a_corners;
+
+  // billboarding
+  vec3 cameraRight = vec3(u_viewInverse[0].x, u_viewInverse[1].x, u_viewInverse[2].x);
+  vec3 cameraUp = vec3(u_viewInverse[0].y, u_viewInverse[1].y, u_viewInverse[2].y);
+  position.xyz += cameraRight * a_corners.x + cameraUp * a_corners.y;
+
+  gl_Position = (u_worldViewProjection * position);
 }
 `;
 
@@ -82,14 +93,14 @@ void main() {
       return Math.floor(Math.random() * range);
     };
 
-    const pos = [];
-    // const img = [];
-    const tex = [];
+    const pos = []; // node centre positions
+    const cor = []; // node corners
+    const tex = []; // texture coordinates
     // const ind = [];
 
     // How many nodes to draw?
     //
-    const nNodes = 100;
+    const nNodes = 1000;
     console.log(`nNodes: ${nNodes}`);
 
     // How big are the nodes?
@@ -112,9 +123,14 @@ void main() {
       // tex.push(0, 0, 0, 1, 1, 0, 1, 1);
       // ind.push(0, 1, 2, 1, 2, 3);
 
-      pos.push(x, y, z,  x + ndiam, y, z,  x, y + ndiam, z,
-                         x + ndiam, y, z,  x, y + ndiam, z,  x + ndiam, y + ndiam, z);
-      const c = i%3;
+      // pos.push(x, y, z,  x + ndiam, y, z,  x, y + ndiam, z,
+      //                    x + ndiam, y, z,  x, y + ndiam, z,  x + ndiam, y + ndiam, z);
+      const r = ndiam/2;
+      pos.push(x,y,z, x,y,z, x,y,z, x,y,z, x,y,z, x,y,z);
+      cor.push(-r,-r, r,-r, -r,r,
+                      r,-r, -r,r, r,r);
+
+      // const c = i%3;
       // img.push(c, c, c, c, c, c);
       // img.push(2,2,2,2);
 
@@ -154,8 +170,9 @@ void main() {
 
     const arrays = {
       position: {numComponents:3, data:pos},
+      corners:  {numComponents:2, data:cor},
       // image:    {numComponents:1, data:img},
-      texcoord: {numComponents:2, data:tex},
+      texcoord: {numComponents:2, data:tex}
       // indices:  {numComponents:3, data:ind},
     }
     const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
@@ -223,10 +240,10 @@ void main() {
       // // Compute the camera's matrix using look at.
       cameraPosition[0] = Math.sin(time) * camDist;
       cameraPosition[2] = Math.cos(time) * camDist;
-      const cameraMatrix = m4.lookAt(cameraPosition, target, up, uniformsThatAreTheSameForAllObjects.u_viewInverse);
+      const cameraMatrix = m4.lookAt(cameraPosition, target, up)//, uniformsThatAreTheSameForAllObjects.u_viewInverse);
 
       // Make a view matrix from the camera matrix.
-      const viewMatrix = m4.inverse(cameraMatrix);
+      const viewMatrix = m4.inverse(cameraMatrix, uniformsThatAreTheSameForAllObjects.u_viewInverse);
 
       const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
       const worldMatrix = m4.identity();
