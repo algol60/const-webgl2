@@ -50,6 +50,26 @@ function* sphereBuilder(n) {
 }
 
 /**
+ * Find the radius of a scene represented by an array of x,y,z coordinates.
+ * In other words, find the largest absolute value in the array.
+ *
+ * @param {*} coords An array of x,y,z coordinates.
+ */
+function coordsRadius(coords) {
+//   const sceneRadius = Math.max(Math.abs(Math.max(...pos)), Math.abs(Math.min(...pos)));
+  if (coords.length==0) {
+    return 0;
+  }
+
+  let m = coords[0];
+  for (const c of coords) {
+    m = Math.max(m, Math.abs(c));
+  }
+
+  return m;
+}
+
+/**
  * Determine how far should the camera be from the centre of the scene so
  * all of the scene is visible.
  */
@@ -70,4 +90,4 @@ function cameraDistance(sceneRadius) {
   return d;
 }
 
-export {CAMERA_NEAR, CAMERA_FAR, FIELD_OF_VIEW, cameraDistance, degToRad, sphereBuilder};
+export {CAMERA_NEAR, CAMERA_FAR, FIELD_OF_VIEW, cameraDistance, degToRad, coordsRadius, sphereBuilder};

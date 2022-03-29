@@ -1,8 +1,8 @@
-import {CAMERA_FAR, CAMERA_NEAR, FIELD_OF_VIEW, degToRad, sphereBuilder, cameraDistance} from './resources/graph-util.js';
+import {CAMERA_FAR, CAMERA_NEAR, FIELD_OF_VIEW, coordsRadius, sphereBuilder, cameraDistance} from './resources/graph-util.js';
 
 const vs = `#version 300 es
 uniform mat4 u_worldViewProjection;
-uniform mat4 u_viewInverse;
+uniform mat4 u_view;
 
 in vec4 a_position;
 in vec2 a_corners;
@@ -17,8 +17,8 @@ vec4 position = a_position;
 // position.xy += a_corners;
 
 // billboarding
-vec3 cameraRight = vec3(u_viewInverse[0].x, u_viewInverse[1].x, u_viewInverse[2].x);
-vec3 cameraUp = vec3(u_viewInverse[0].y, u_viewInverse[1].y, u_viewInverse[2].y);
+vec3 cameraRight = vec3(u_view[0].x, u_view[1].x, u_view[2].x);
+vec3 cameraUp = vec3(u_view[0].y, u_view[1].y, u_view[2].y);
 position.xyz += cameraRight * a_corners.x + cameraUp * a_corners.y;
 
 gl_Position = (u_worldViewProjection * position);
@@ -78,35 +78,15 @@ function main() {
   // for (let i = 0; i < nNodes; i++) {
   let i = 0;
   for (const node of sphereBuilder(nNodes)) {
-    // const x = rand(volDiam) - volDiam/2;
-    // const y = rand(volDiam) - volDiam/2;
-    // const z = rand(volDiam) - volDiam/2;
-    // const x = i%8;
-    // const y = Math.floor(i/8);
-    // const z = 0;
-
-    // pos.push(x, y, z,  x + 10, y, z,  x, y + 10, z,  x + 10, y + 10, z);
-    // const c = i%3;
-    // img.push(c,c,c,c);
-    // // img.push(2,2,2,2);
-    // tex.push(0, 0, 0, 1, 1, 0, 1, 1);
     // ind.push(0, 1, 2, 1, 2, 3);
 
-    // pos.push(x, y, z,  x + ndiam, y, z,  x, y + ndiam, z,
-    //                    x + ndiam, y, z,  x, y + ndiam, z,  x + ndiam, y + ndiam, z);
-
-
-    // pos.push(x,y,z, x,y,z, x,y,z, x,y,z, x,y,z, x,y,z);
-    const r = ndiam/2;
+    // Push a central vertex for each triangle.
     for(let vx=0; vx<6; vx++) {
       pos.push(node.x, node.y, node.z);
     }
+    const r = ndiam/2;
     cor.push(-r,-r, r,-r, -r,r,
                     r,-r, -r,r, r,r);
-
-    // const c = i%3;
-    // img.push(c, c, c, c, c, c);
-    // img.push(2,2,2,2);
 
     // The texture atlas has 4 images arranged horizontally.
     //
@@ -115,12 +95,12 @@ function main() {
     // tex.push(1,1, 0,1, 1,0,
     //               0,1, 1,0, 0,0);
     tex.push(texx1,1, texx0,1, texx1,0,
-                  texx0,1, texx1,0, texx0,0);
+                      texx0,1, texx1,0, texx0,0);
     // ind.push(0, 1, 2, 1, 2, 3);
     i++;
   }
 
-  const sceneRadius = Math.max(Math.abs(Math.max(...pos)), Math.abs(Math.min(...pos)));
+  const sceneRadius = coordsRadius(pos);
   console.log(`Scene radius: ${sceneRadius}`);
 
   // Get A WebGL context
@@ -169,9 +149,9 @@ function main() {
   // const fieldOfViewRadians = degToRad(60);
 
   const atlas = textureUtils.loadTexture(gl, 'icons/_atlas.png');
-  const uniformsThatAreTheSameForAllObjects = {
+  const shaderUniforms = {
     u_worldViewProjection: m4.identity(),
-    u_viewInverse:           m4.identity(),
+    u_view:           m4.identity(),
     u_diffuse: atlas
   };
 
@@ -190,12 +170,15 @@ function main() {
 
   // Set up to compute the camera's matrix using look at.
   //
-  // const camDist = volDiam * 0.9;
   const camDist = cameraDistance(sceneRadius);
   console.log(`Camera distance: ${camDist}`);
-  const cameraPosition = [0, 0, camDist];
-  const target = [0, 0, 0];
-  const up = [0, 1, 0];
+
+  const camera = {
+    eye: [0, 0, camDist],
+    target: [0, 0, 0],
+    up: [0, 1, 0],
+    zoom: 1
+  }
 
   requestAnimationFrame(drawScene);
 
@@ -216,16 +199,17 @@ function main() {
       m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
 
     // // Compute the camera's matrix using look at.
-    cameraPosition[0] = Math.sin(time) * camDist;
-    cameraPosition[2] = Math.cos(time) * camDist;
-    const cameraMatrix = m4.lookAt(cameraPosition, target, up)//, uniformsThatAreTheSameForAllObjects.u_viewInverse);
+    camera.eye[0] = Math.sin(time) * camDist;
+    camera.eye[2] = Math.cos(time) * camDist;
+    const cameraMatrix = m4.lookAt(camera.eye, camera.target, camera.up)
 
     // Make a view matrix from the camera matrix.
-    const viewMatrix = m4.inverse(cameraMatrix, uniformsThatAreTheSameForAllObjects.u_viewInverse);
+    const viewMatrix = m4.inverse(cameraMatrix, shaderUniforms.u_view);
 
     const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+
     const worldMatrix = m4.identity();
-    m4.multiply(viewProjectionMatrix, worldMatrix, uniformsThatAreTheSameForAllObjects.u_worldViewProjection);
+    m4.multiply(viewProjectionMatrix, worldMatrix, shaderUniforms.u_worldViewProjection);
 
     gl.useProgram(program);
 
@@ -233,7 +217,7 @@ function main() {
     gl.bindVertexArray(vao);
 
     // Set the uniforms that are the same for all objects.
-    twgl.setUniforms(uniformSetters, uniformsThatAreTheSameForAllObjects);
+    twgl.setUniforms(uniformSetters, shaderUniforms);
 
     // // Draw objects
 
@@ -261,6 +245,51 @@ function main() {
 
     requestAnimationFrame(drawScene);
   }
+
+  function getClipSpaceMousePosition(e) {
+    // get canvas relative css position
+    const rect = canvas.getBoundingClientRect();
+    const cssX = e.clientX - rect.left;
+    const cssY = e.clientY - rect.top;
+
+    // get normalized 0 to 1 position across and down canvas
+    const normalizedX = cssX / canvas.clientWidth;
+    const normalizedY = cssY / canvas.clientHeight;
+
+    // convert to clip space
+    const clipX = normalizedX *  2 - 1;
+    const clipY = normalizedY * -2 + 1;
+
+    return [clipX, clipY];
+  }
+
+  // canvas.addEventListener('wheel', (e) => {
+  //   e.preventDefault();
+  //   const [clipX, clipY] = getClipSpaceMousePosition(e);
+  //   console.log(`clip ${clipX} ${clipY}`);
+
+  //   // position before zooming
+  //   const [preZoomX, preZoomY] = m3.transformPoint(
+  //       m3.inverse(viewProjectionMat),
+  //       [clipX, clipY]);
+
+  //   // multiply the wheel movement by the current zoom level
+  //   // so we zoom less when zoomed in and more when zoomed out
+  //   const newZoom = camera.zoom * Math.pow(2, e.deltaY * -0.01);
+  //   camera.zoom = Math.max(0.02, Math.min(100, newZoom));
+
+  //   updateViewProjection();
+
+  //   // position after zooming
+  //   const [postZoomX, postZoomY] = m3.transformPoint(
+  //       m3.inverse(viewProjectionMat),
+  //       [clipX, clipY]);
+
+  //   // camera needs to be moved the difference of before and after
+  //   camera.eye[0] += preZoomX - postZoomX;
+  //   camera.eye[1] += preZoomY - postZoomY;
+  // });
+
 }
 
 main();
