@@ -1,4 +1,4 @@
-import {CAMERA_FAR, CAMERA_NEAR, FIELD_OF_VIEW, coordsRadius, sphereBuilder, cameraDistance} from './resources/graph-util.js';
+import {CAMERA_FAR, CAMERA_NEAR, FIELD_OF_VIEW, convertZoomPointToDirection, coordsRadius, sphereBuilder, cameraDistance} from './resources/graph-util.js';
 
 const vs = `#version 300 es
 uniform mat4 u_worldViewProjection;
@@ -148,7 +148,10 @@ function main() {
 
   // const fieldOfViewRadians = degToRad(60);
 
-  const atlas = textureUtils.loadTexture(gl, 'icons/_atlas.png');
+  // Load the texture; do a redraw when the load is complete.
+  //
+  const atlas = textureUtils.loadTexture(gl, 'icons/_atlas.png', () => requestAnimationFrame(drawScene));
+
   const shaderUniforms = {
     u_worldViewProjection: m4.identity(),
     u_view:           m4.identity(),
@@ -168,9 +171,9 @@ function main() {
   //   // textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,0,0,0)', color2: "#CCC", }),
   // ];
 
-  // Set up to compute the camera's matrix using look at.
+  // Set up to compute the camera's matrix using lookAt.
   //
-  const camDist = cameraDistance(sceneRadius);
+  const camDist = cameraDistance(gl.canvas, sceneRadius);
   console.log(`Camera distance: ${camDist}`);
 
   const camera = {
@@ -180,10 +183,21 @@ function main() {
     zoom: 1
   }
 
-  requestAnimationFrame(drawScene);
+  let cameraMatrix;
+  let viewProjectionMatrix;
+  function updateViewProjectionMatrix(copyViewMatrix) {
+    // Compute the projection matrix
+    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    const projectionMatrix =
+      m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
+    // Make a view matrix from the camera matrix.
+    const viewMatrix = m4.inverse(cameraMatrix, copyViewMatrix);
+    viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+  }
 
   // Draw the scene.
   function drawScene(time) {
+    console.log(`draw at time ${time}`)
     time = time * 0.001;
 
     twgl.resizeCanvasToDisplaySize(gl.canvas);
@@ -193,20 +207,21 @@ function main() {
 
     gl.enable(gl.DEPTH_TEST);
 
-    // Compute the projection matrix
-    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    const projectionMatrix =
-      m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
+    // // Compute the projection matrix
+    // const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    // const projectionMatrix =
+    //   m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
 
     // // Compute the camera's matrix using look at.
-    camera.eye[0] = Math.sin(time) * camDist;
-    camera.eye[2] = Math.cos(time) * camDist;
-    const cameraMatrix = m4.lookAt(camera.eye, camera.target, camera.up)
+    // camera.eye[0] = Math.sin(time) * camDist;
+    // camera.eye[2] = Math.cos(time) * camDist;
+    cameraMatrix = m4.lookAt(camera.eye, camera.target, camera.up)
 
-    // Make a view matrix from the camera matrix.
-    const viewMatrix = m4.inverse(cameraMatrix, shaderUniforms.u_view);
-
-    const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+    // // Make a view matrix from the camera matrix.
+    // const viewMatrix = m4.inverse(cameraMatrix);//, shaderUniforms.u_view);
+    // shaderUniforms.u_view = viewMatrix;
+    // const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+    updateViewProjectionMatrix(shaderUniforms.u_view);
 
     const worldMatrix = m4.identity();
     m4.multiply(viewProjectionMatrix, worldMatrix, shaderUniforms.u_worldViewProjection);
@@ -242,54 +257,56 @@ function main() {
     // gl.drawElements(gl.TRIANGLES, bufferInfo.numElements, gl.UNSIGNED_SHORT, 0);
     gl.drawArrays(gl.TRIANGLES, 0, bufferInfo.numElements);
     // console.log(bufferInfo.numElements);
+  }
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+
+    // Copy Constellation's algorithm.
+    //
+    const zoomDirection = convertZoomPointToDirection(canvas.width, canvas.height, e.clientX, e.clientY);
+
+    // Invert the wheel direction and make the movement smaller.
+    //
+    const d = -Math.sign(e.deltaY) / 10.0;
+
+    const norm = m4.normalize(zoomDirection);
+    norm[0] *= d;
+    norm[1] *= d;
+    norm[2] *= d;
+    console.log(`zd ${e.clientX},${e.clientY} -> ${zoomDirection} -> ${norm}`);
+
+    const direction = m4.subtractVectors(camera.eye, camera.target);
+    const origin = [0.0, 0.0, 0.0];
+    const up = camera.up.slice();
+
+    // Move forward along the z axis.
+    //
+    origin[0] += direction[0] * norm[2];
+    origin[1] += direction[1] * norm[2];
+    origin[2] += direction[2] * norm[2];
+
+    // Move up along the y axis.
+    //
+    origin[0] += up[0] * norm[1];
+    origin[1] += up[1] * norm[1];
+    origin[2] += up[2] * norm[1];
+
+    // Move right along the x axis.
+    //
+    const cross = m4.cross(up, direction);
+    origin[0] += cross[0] * norm[0];
+    origin[1] += cross[1] * norm[0];
+    origin[2] += cross[2] * norm[0];
+    console.log(`eye ${origin}`);
+
+    camera.eye = m4.subtractVectors(camera.eye, origin);
+    camera.target = m4.subtractVectors(camera.target, origin);
 
     requestAnimationFrame(drawScene);
-  }
+  });
 
-  function getClipSpaceMousePosition(e) {
-    // get canvas relative css position
-    const rect = canvas.getBoundingClientRect();
-    const cssX = e.clientX - rect.left;
-    const cssY = e.clientY - rect.top;
-
-    // get normalized 0 to 1 position across and down canvas
-    const normalizedX = cssX / canvas.clientWidth;
-    const normalizedY = cssY / canvas.clientHeight;
-
-    // convert to clip space
-    const clipX = normalizedX *  2 - 1;
-    const clipY = normalizedY * -2 + 1;
-
-    return [clipX, clipY];
-  }
-
-  // canvas.addEventListener('wheel', (e) => {
-  //   e.preventDefault();
-  //   const [clipX, clipY] = getClipSpaceMousePosition(e);
-  //   console.log(`clip ${clipX} ${clipY}`);
-
-  //   // position before zooming
-  //   const [preZoomX, preZoomY] = m3.transformPoint(
-  //       m3.inverse(viewProjectionMat),
-  //       [clipX, clipY]);
-
-  //   // multiply the wheel movement by the current zoom level
-  //   // so we zoom less when zoomed in and more when zoomed out
-  //   const newZoom = camera.zoom * Math.pow(2, e.deltaY * -0.01);
-  //   camera.zoom = Math.max(0.02, Math.min(100, newZoom));
-
-  //   updateViewProjection();
-
-  //   // position after zooming
-  //   const [postZoomX, postZoomY] = m3.transformPoint(
-  //       m3.inverse(viewProjectionMat),
-  //       [clipX, clipY]);
-
-  //   // camera needs to be moved the difference of before and after
-  //   camera.eye[0] += preZoomX - postZoomX;
-  //   camera.eye[1] += preZoomY - postZoomY;
-  // });
-
+  requestAnimationFrame(drawScene);
 }
 
 main();

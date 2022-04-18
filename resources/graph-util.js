@@ -73,10 +73,11 @@ function coordsRadius(coords) {
  * Determine how far should the camera be from the centre of the scene so
  * all of the scene is visible.
  */
-function cameraDistance(sceneRadius) {
+function cameraDistance(glCanvas, sceneRadius) {
+  const aspect = glCanvas.clientWidth / glCanvas.clientHeight;
 
   // Find out how far the camera should be from the centre of the bounding sphere.
-  let d = sceneRadius * (1.0 / Math.tan(FIELD_OF_VIEW / 2.0));
+  let d = sceneRadius * (1.0 / Math.tan(FIELD_OF_VIEW / 2.0)) * aspect;
 
   // Don't place the camera nearer than the near edge of the frustum.
   d = Math.max(d, CAMERA_NEAR);
@@ -90,4 +91,12 @@ function cameraDistance(sceneRadius) {
   return d;
 }
 
-export {CAMERA_NEAR, CAMERA_FAR, FIELD_OF_VIEW, cameraDistance, degToRad, coordsRadius, sphereBuilder};
+function convertZoomPointToDirection(canvasW, canvasH, clientX, clientY) {
+  return [
+    canvasW / 2.0 - clientX,
+    clientY - canvasH / 2.0,
+    canvasH / (2.0 * Math.tan(FIELD_OF_VIEW/2.0))
+  ];
+}
+
+export {CAMERA_NEAR, CAMERA_FAR, FIELD_OF_VIEW, cameraDistance, convertZoomPointToDirection, degToRad, coordsRadius, sphereBuilder};

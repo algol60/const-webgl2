@@ -139,7 +139,7 @@ var makeRandomTexture = function(gl, options) {
   return texture;
 };
 
-function loadTexture(gl, url) {
+function loadTexture(gl, url, onLoad) {
   const texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
 
@@ -147,7 +147,8 @@ function loadTexture(gl, url) {
   // they might take a moment until they are ready.
   // Until then put a single pixel in the texture so we can
   // use it immediately. When the image has finished downloading
-  // we'll update the texture with the contents of the image.
+  // we'll update the texture with the contents of the image,
+  // and call onLoad.
   const level = 0;
   const internalFormat = gl.RGBA;
   const width = 1024;
@@ -178,6 +179,10 @@ function loadTexture(gl, url) {
        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    }
+
+    if(onLoad) {
+      onLoad();
     }
   };
   image.src = url;
