@@ -264,7 +264,11 @@ function main() {
 
     // Copy Constellation's algorithm.
     //
-    const zoomDirection = convertZoomPointToDirection(canvas.width, canvas.height, e.clientX, e.clientY);
+    const zoomDirection = convertZoomPointToDirection(gl.canvas.width, gl.canvas.height, e.clientX, e.clientY);
+
+    const focusVector = m4.subtractVectors(camera.target, camera.eye);
+    const len = m4.length(focusVector);
+    // console.log(`length=${focusVector} ${len}`);
 
     // Invert the wheel direction and make the movement smaller.
     //
@@ -274,23 +278,27 @@ function main() {
     norm[0] *= d;
     norm[1] *= d;
     norm[2] *= d;
-    console.log(`zd ${e.clientX},${e.clientY} -> ${zoomDirection} -> ${norm}`);
+    // console.log(`zd ${e.clientX},${e.clientY} -> ${zoomDirection} -> ${norm}`);
 
-    const direction = m4.subtractVectors(camera.eye, camera.target);
     const origin = [0.0, 0.0, 0.0];
+    const direction = m4.subtractVectors(camera.eye, camera.target);
     const up = camera.up.slice();
+    // console.log(`direction ${direction}`);
 
     // Move forward along the z axis.
     //
     origin[0] += direction[0] * norm[2];
     origin[1] += direction[1] * norm[2];
     origin[2] += direction[2] * norm[2];
+    // console.log(`originz ${origin}`);
 
     // Move up along the y axis.
+    // Why multiply by len here? Constellation does it for all three.
     //
-    origin[0] += up[0] * norm[1];
-    origin[1] += up[1] * norm[1];
-    origin[2] += up[2] * norm[1];
+    origin[0] += up[0] * norm[1] * len;
+    origin[1] += up[1] * norm[1] * len;
+    origin[2] += up[2] * norm[1] * len;
+    // console.log(`originy ${origin}`);
 
     // Move right along the x axis.
     //
@@ -298,8 +306,9 @@ function main() {
     origin[0] += cross[0] * norm[0];
     origin[1] += cross[1] * norm[0];
     origin[2] += cross[2] * norm[0];
-    console.log(`eye ${origin}`);
+    // console.log(`originx ${origin}`);
 
+    // console.log(`eye ${origin}`);
     camera.eye = m4.subtractVectors(camera.eye, origin);
     camera.target = m4.subtractVectors(camera.target, origin);
 
