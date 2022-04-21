@@ -99,4 +99,13 @@ function convertZoomPointToDirection(canvasW, canvasH, clientX, clientY) {
   ];
 }
 
-export {CAMERA_NEAR, CAMERA_FAR, FIELD_OF_VIEW, cameraDistance, convertZoomPointToDirection, degToRad, coordsRadius, sphereBuilder};
+// These names must match the list of names in make_atlas.py.
+//
+const names = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis', 'australia', 'china', 'russia', 'ukraine',
+'flat_circle', 'flat_square', 'round_circle', 'round_square', 'transparent'];
+
+function textureIndex(name) {
+  return names.indexOf(name);
+}
+
+export {CAMERA_NEAR, CAMERA_FAR, FIELD_OF_VIEW, cameraDistance, convertZoomPointToDirection, degToRad, coordsRadius, sphereBuilder, textureIndex};

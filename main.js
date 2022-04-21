@@ -1,4 +1,4 @@
-import {CAMERA_FAR, CAMERA_NEAR, FIELD_OF_VIEW, convertZoomPointToDirection, coordsRadius, sphereBuilder, cameraDistance} from './resources/graph-util.js';
+import {CAMERA_FAR, CAMERA_NEAR, FIELD_OF_VIEW, convertZoomPointToDirection, coordsRadius, sphereBuilder, cameraDistance, textureIndex} from './resources/graph-util.js';
 
 const vs = `#version 300 es
 uniform mat4 u_worldViewProjection;
@@ -6,41 +6,54 @@ uniform mat4 u_view;
 
 in vec4 a_position;
 in vec2 a_corners;
-in vec2 a_texcoord;
+in vec2 a_fgCoord;
+in vec2 a_bgCoord;
+in vec3 a_color;
 
-out vec2 v_texCoord;
+out vec2 v_fgCoord;
+out vec2 v_bgCoord;
+out vec3 v_color;
 
 void main() {
-v_texCoord = a_texcoord;
+  v_fgCoord = a_fgCoord;
+  v_bgCoord = a_bgCoord;
+  v_color = a_color;
 
-vec4 position = a_position;
-// position.xy += a_corners;
+  vec4 position = a_position;
+  // position.xy += a_corners;
 
-// billboarding
-vec3 cameraRight = vec3(u_view[0].x, u_view[1].x, u_view[2].x);
-vec3 cameraUp = vec3(u_view[0].y, u_view[1].y, u_view[2].y);
-position.xyz += cameraRight * a_corners.x + cameraUp * a_corners.y;
+  // billboarding
+  vec3 cameraRight = vec3(u_view[0].x, u_view[1].x, u_view[2].x);
+  vec3 cameraUp = vec3(u_view[0].y, u_view[1].y, u_view[2].y);
+  position.xyz += cameraRight * a_corners.x + cameraUp * a_corners.y;
 
-gl_Position = (u_worldViewProjection * position);
+  gl_Position = u_worldViewProjection * position;
 }
 `;
 
 const fs = `#version 300 es
 precision highp float;
 
-in vec2 v_texCoord;
+in vec2 v_fgCoord;
+in vec2 v_bgCoord;
+in vec3 v_color;
 
 uniform sampler2D u_diffuse;
 
 out vec4 outColor;
 
 void main() {
-vec4 diffuseColor = texture(u_diffuse, v_texCoord);
-
-if (diffuseColor.a<0.1) {
-  discard;
-}
-outColor = diffuseColor;
+  vec4 color = texture(u_diffuse, v_fgCoord);
+  if (color.a>=0.1) {
+    outColor = color;
+  } else {
+    color = texture(u_diffuse, v_bgCoord);
+    if (color.a<0.1) {
+      discard;
+    } else {
+      outColor = color * vec4(v_color, 1);
+    }
+  }
 }
 `;
 
@@ -59,12 +72,16 @@ function main() {
 
   const pos = []; // node centre positions
   const cor = []; // node corners
-  const tex = []; // texture coordinates
+  const fgTex = []; // Foreground icon texture coordinates
+  const bgTex = []; // Background icon texture coordinates
+  const color = []; // node color
   // const ind = [];
+
+  const spin = false;
 
   // How many nodes to draw?
   //
-  const nNodes = 100;
+  const nNodes = 1_000;
   console.log(`nNodes: ${nNodes}`);
 
   // How big are the nodes?
@@ -75,27 +92,53 @@ function main() {
   //
   const volDiam = ndiam/2 * Math.sqrt(nNodes);
   console.log(`Volume diameter: ${volDiam}`);
-  // for (let i = 0; i < nNodes; i++) {
+
+  const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
+  const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
+
   let i = 0;
   for (const node of sphereBuilder(nNodes)) {
     // ind.push(0, 1, 2, 1, 2, 3);
 
+    const red = Math.random();
+    const gre = Math.random();
+    const blu = Math.random();
+
     // Push a central vertex for each triangle.
     for(let vx=0; vx<6; vx++) {
       pos.push(node.x, node.y, node.z);
+      color.push(red, gre, blu);
     }
     const r = ndiam/2;
     cor.push(-r,-r, r,-r, -r,r,
                     r,-r, -r,r, r,r);
 
-    // The texture atlas has 4 images arranged horizontally.
+    // The texture atlas contains 8x8 images, each image is 256x256.
+    // Same as Constellation, except it uses a 2D texture.
+    // Calculate leftx, topy, rightx, bottomy for texcoords.
     //
-    const texx0 = (i%4) / 4;
-    const texx1 = texx0 + 0.25;
-    // tex.push(1,1, 0,1, 1,0,
-    //               0,1, 1,0, 0,0);
-    tex.push(texx1,1, texx0,1, texx1,0,
-                      texx0,1, texx1,0, texx0,0);
+    const TEXTURE_SIZE = 0.125;
+    const HALF_PIXEL = (0.5 / (256 * 8));
+
+    const push_tex_coords = (buf, img_ix) => {
+      const tex_lx = img_ix%8 / 8;
+      const tex_ty = Math.trunc(img_ix/8) / 8;
+      const tex_rx = tex_lx + TEXTURE_SIZE;
+      const tex_by = tex_ty + TEXTURE_SIZE;
+      buf.push(tex_rx,tex_by, tex_lx,tex_by, tex_rx,tex_ty,
+                              tex_lx,tex_by, tex_rx,tex_ty, tex_lx, tex_ty);
+    };
+
+    // Node foreground icons.
+    //
+    const fg_name = FG_ICONS[i%FG_ICONS.length];
+    push_tex_coords(fgTex, textureIndex(fg_name));
+
+    // Node background icons.
+    //
+    const bg_name = BG_ICONS[i%BG_ICONS.length];
+    push_tex_coords(bgTex, textureIndex(bg_name));
+
     // ind.push(0, 1, 2, 1, 2, 3);
     i++;
   }
@@ -129,7 +172,9 @@ function main() {
     position: {numComponents:3, data:pos},
     corners:  {numComponents:2, data:cor},
     // image:    {numComponents:1, data:img},
-    texcoord: {numComponents:2, data:tex}
+    fgCoord:  {numComponents:2, data:fgTex},
+    bgCoord:  {numComponents:2, data:bgTex},
+    color:    {numComponents:3, data:color}
     // indices:  {numComponents:3, data:ind},
   }
   const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
@@ -141,12 +186,6 @@ function main() {
 
   const vao = twgl.createVAOFromBufferInfo(
     gl, attribSetters, bufferInfo);
-
-  // function degToRad(d) {
-  //   return d * Math.PI / 180;
-  // }
-
-  // const fieldOfViewRadians = degToRad(60);
 
   // Load the texture; do a redraw when the load is complete.
   //
@@ -164,13 +203,6 @@ function main() {
   //   u_worldInverseTranspose: m4.identity(),
   // };
 
-  // const textures = [
-  //   textureUtils.makeStripeTexture(gl, { color1: "#F00", color2: "#700", }),
-  //   textureUtils.makeCheckerTexture(gl, { color1: "#070", color2: "#0F0", }),
-  //   textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,255,255,0.0)', color2: '#00F', }),
-  //   // textureUtils.makeCircleTexture(gl, { color1: 'rgba(255,0,0,0)', color2: "#CCC", }),
-  // ];
-
   // Set up to compute the camera's matrix using lookAt.
   //
   const camDist = cameraDistance(gl.canvas, sceneRadius);
@@ -179,8 +211,8 @@ function main() {
   const camera = {
     eye: [0, 0, camDist],
     target: [0, 0, 0],
-    up: [0, 1, 0],
-    zoom: 1
+    up: [0, 1, 0]//,
+    // zoom: 1
   }
 
   let cameraMatrix;
@@ -212,9 +244,11 @@ function main() {
     // const projectionMatrix =
     //   m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
 
-    // // Compute the camera's matrix using look at.
-    // camera.eye[0] = Math.sin(time) * camDist;
-    // camera.eye[2] = Math.cos(time) * camDist;
+    if (spin) {
+      camera.eye[0] = Math.sin(time) * camDist;
+      camera.eye[2] = Math.cos(time) * camDist;
+    }
+
     cameraMatrix = m4.lookAt(camera.eye, camera.target, camera.up)
 
     // // Make a view matrix from the camera matrix.
@@ -257,6 +291,10 @@ function main() {
     // gl.drawElements(gl.TRIANGLES, bufferInfo.numElements, gl.UNSIGNED_SHORT, 0);
     gl.drawArrays(gl.TRIANGLES, 0, bufferInfo.numElements);
     // console.log(bufferInfo.numElements);
+
+    if (spin) {
+      requestAnimationFrame(drawScene);
+    }
   }
 
   canvas.addEventListener('wheel', (e) => {
@@ -272,7 +310,7 @@ function main() {
 
     // Invert the wheel direction and make the movement smaller.
     //
-    const d = -Math.sign(e.deltaY) / 10.0;
+    const d = -Math.sign(e.deltaY) / 32.0;
 
     const norm = m4.normalize(zoomDirection);
     norm[0] *= d;
