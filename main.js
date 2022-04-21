@@ -7,16 +7,20 @@ uniform mat4 u_view;
 in vec4 a_position;
 in vec2 a_corners;
 in vec2 a_fgCoord;
-in vec2 a_bgCoord;
+// in vec2 a_bgCoord;
 in vec3 a_color;
+in uint a_fgIconIndex;
+in uint a_bgIconIndex;
 
 out vec2 v_fgCoord;
-out vec2 v_bgCoord;
+// out vec2 v_bgCoord;
 out vec3 v_color;
+flat out uint fgIcon;
+flat out uint bgIcon;
 
 void main() {
   v_fgCoord = a_fgCoord;
-  v_bgCoord = a_bgCoord;
+  // v_bgCoord = a_bgCoord;
   v_color = a_color;
 
   vec4 position = a_position;
@@ -28,6 +32,9 @@ void main() {
   position.xyz += cameraRight * a_corners.x + cameraUp * a_corners.y;
 
   gl_Position = u_worldViewProjection * position;
+
+  fgIcon = a_fgIconIndex;
+  bgIcon = a_bgIconIndex;
 }
 `;
 
@@ -35,24 +42,57 @@ const fs = `#version 300 es
 precision highp float;
 
 in vec2 v_fgCoord;
-in vec2 v_bgCoord;
+// in vec2 v_bgCoord;
 in vec3 v_color;
+flat in uint fgIcon;
+flat in uint bgIcon;
 
 uniform sampler2D u_diffuse;
 
 out vec4 outColor;
 
 void main() {
-  vec4 color = texture(u_diffuse, v_fgCoord);
+
+  // We don't get the texture coordinates for each icon.
+  // The texture coordinate is a (0..1, 0..1) range.
+  // Instead, we get the icon index, and figure out the icon coordinates here.
+  // This saves bytes for each icon.
+  //
+  vec2 bgxy = vec2(bgIcon%8u, bgIcon/8u) / 8.0;
+  vec2 fgxy = vec2(fgIcon%8u, fgIcon/8u) / 8.0;
+  vec2 size = vec2(0.125, 0.125);
+
+  vec4 color = texture(u_diffuse, fgxy + size * v_fgCoord);
   if (color.a>=0.1) {
     outColor = color;
   } else {
-    color = texture(u_diffuse, v_bgCoord);
-    if (color.a<0.1) {
-      discard;
-    } else {
+    color = texture(u_diffuse, bgxy + size * v_fgCoord);
+    if (color.a>=0.1) {
       outColor = color * vec4(v_color, 1);
     }
+  }
+
+  // Testing: overlay the same icon; actually, get it from another index.
+  float decoratorRadius = 3.0;
+  float inv = 1.0 / decoratorRadius;
+  if (v_fgCoord.x<inv && v_fgCoord.y<inv) {
+    vec4 dColor = texture(u_diffuse, fgxy + size*decoratorRadius * v_fgCoord);
+    if (dColor.a>=0.1) {
+      outColor = dColor;
+    }
+  }
+
+  if (v_fgCoord.x>(1.0-inv) && v_fgCoord.y>(1.0-inv)) {
+    vec4 dColor = texture(u_diffuse, fgxy + size*decoratorRadius * (v_fgCoord-(1.0-inv)));
+    if (dColor.a>=0.1) {
+      outColor = dColor;
+    }
+  }
+
+  // TODO bottom left, top right.
+
+  if (outColor.a<0.1) {
+    discard;
   }
 }
 `;
@@ -73,7 +113,7 @@ function main() {
   const pos = []; // node centre positions
   const cor = []; // node corners
   const fgTex = []; // Foreground icon texture coordinates
-  const bgTex = []; // Background icon texture coordinates
+  // const bgTex = []; // Background icon texture coordinates
   const color = []; // node color
   // const ind = [];
 
@@ -93,8 +133,11 @@ function main() {
   const volDiam = ndiam/2 * Math.sqrt(nNodes);
   console.log(`Volume diameter: ${volDiam}`);
 
-  const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
+  const FG_ICONS = ['dalek', 'check', 'mr_squiggle', 'tardis'];
   const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
+
+  const fgIconIndex = new Uint16Array(nNodes*6);
+  const bgIconIndex = new Uint16Array(nNodes*6);
 
   let i = 0;
   for (const node of sphereBuilder(nNodes)) {
@@ -104,11 +147,6 @@ function main() {
     const gre = Math.random();
     const blu = Math.random();
 
-    // Push a central vertex for each triangle.
-    for(let vx=0; vx<6; vx++) {
-      pos.push(node.x, node.y, node.z);
-      color.push(red, gre, blu);
-    }
     const r = ndiam/2;
     cor.push(-r,-r, r,-r, -r,r,
                     r,-r, -r,r, r,r);
@@ -121,23 +159,39 @@ function main() {
     const HALF_PIXEL = (0.5 / (256 * 8));
 
     const push_tex_coords = (buf, img_ix) => {
-      const tex_lx = img_ix%8 / 8;
-      const tex_ty = Math.trunc(img_ix/8) / 8;
-      const tex_rx = tex_lx + TEXTURE_SIZE;
-      const tex_by = tex_ty + TEXTURE_SIZE;
-      buf.push(tex_rx,tex_by, tex_lx,tex_by, tex_rx,tex_ty,
-                              tex_lx,tex_by, tex_rx,tex_ty, tex_lx, tex_ty);
+    //   const tex_lx = img_ix%8 / 8;
+    //   const tex_ty = Math.trunc(img_ix/8) / 8;
+    //   const tex_rx = tex_lx + TEXTURE_SIZE;
+    //   const tex_by = tex_ty + TEXTURE_SIZE;
+    //   buf.push(tex_rx,tex_by, tex_lx,tex_by, tex_rx,tex_ty,
+    //                           tex_lx,tex_by, tex_rx,tex_ty, tex_lx, tex_ty);
+      buf.push(0,1, 1,1, 0,0,
+                    1,1, 0,0, 1,0);
     };
 
     // Node foreground icons.
     //
     const fg_name = FG_ICONS[i%FG_ICONS.length];
-    push_tex_coords(fgTex, textureIndex(fg_name));
+    const fgTexIndex = textureIndex(fg_name);
+    push_tex_coords(fgTex, fgTexIndex);
+    // fgIconIndex[i] = textureIndex(fg_name);
 
     // Node background icons.
     //
     const bg_name = BG_ICONS[i%BG_ICONS.length];
-    push_tex_coords(bgTex, textureIndex(bg_name));
+    const bgTexIndex = textureIndex(fg_name);
+    // push_tex_coords(bgTex, bgTexIndex);
+    // bgIconIndex[i] = textureIndex(fg_name);
+
+    // Push a central vertex for each triangle.
+    // The vertex shader will set the position for each corner.
+    //
+    for(let vx=0; vx<6; vx++) {
+      pos.push(node.x, node.y, node.z);
+      color.push(red, gre, blu);
+      fgIconIndex[i*6+vx] = fgTexIndex;
+      bgIconIndex[i*6+vx] = bgTexIndex;
+    }
 
     // ind.push(0, 1, 2, 1, 2, 3);
     i++;
@@ -173,10 +227,12 @@ function main() {
     corners:  {numComponents:2, data:cor},
     // image:    {numComponents:1, data:img},
     fgCoord:  {numComponents:2, data:fgTex},
-    bgCoord:  {numComponents:2, data:bgTex},
-    color:    {numComponents:3, data:color}
+    // bgCoord:  {numComponents:2, data:bgTex},
+    color:    {numComponents:3, data:color},
+    fgIconIndex: {numComponents:1, data:fgIconIndex},
+    bgIconIndex: {numComponents:1, data:bgIconIndex}
     // indices:  {numComponents:3, data:ind},
-  }
+  };
   const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
 
   // setup GLSL program
@@ -238,6 +294,9 @@ function main() {
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
     gl.enable(gl.DEPTH_TEST);
+    gl.clearColor(0.1, 0.1, 0.1, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
     // // Compute the projection matrix
     // const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;

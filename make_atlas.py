@@ -3,7 +3,9 @@
 
 from PIL import Image, ImageDraw
 
-IMAGES = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis', 'australia', 'china', 'russia', 'ukraine']
+# Update graph-util.js when changing these.
+#
+IMAGES = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis', 'australia', 'china', 'russia', 'ukraine', 'check']
 IMAGES_BG = ['flat_circle', 'flat_square', 'round_circle', 'round_square', 'transparent']
 
 def open_images(image_names):

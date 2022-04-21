@@ -33,6 +33,10 @@ If you feel the camera is spinning too slowly or quickly, change the re-definiti
 time = time * 0.001;
 ```
 
+## Notes
+
+- Instead of sending icon texture coordinates for up to six different icons per node (foreground, background, four decorators), send a single 0..1 set of coordinates and the icon index, and let the fragment shader calculate the cooordinates from the index and the known size of the texture atlas.
+
 # Obvious next steps
 
 - More complicated shaders to match Constellation.
@@ -40,4 +44,4 @@ time = time * 0.001;
 - Use mouse interaction to get a better idea of how user interaction feels.
 - Selection, dragging, etc.
 - Use indexing to save buffer memory.
-- Instead of sending icon texture coordinates for up to six different icons per node (foreground, background, four decorators), send a single 0..1 set of coordinates and the icon index, and let the fragment shader calculate the cooordinates from the index and the known size of the texture atlas.
+- For x,y,z use a texture buffer and gl_VertexID/texelFetch() (like Constellation).
