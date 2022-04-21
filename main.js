@@ -3,6 +3,7 @@ import {CAMERA_FAR, CAMERA_NEAR, FIELD_OF_VIEW, convertZoomPointToDirection, coo
 const vs = `#version 300 es
 uniform mat4 u_worldViewProjection;
 uniform mat4 u_view;
+uniform mat4 u_model;
 
 in vec4 a_position;
 in vec2 a_corners;
@@ -23,7 +24,7 @@ void main() {
   // v_bgCoord = a_bgCoord;
   v_color = a_color;
 
-  vec4 position = a_position;
+  vec4 position =  u_model * a_position;
   // position.xy += a_corners;
 
   // billboarding
@@ -133,7 +134,7 @@ function main() {
   const volDiam = ndiam/2 * Math.sqrt(nNodes);
   console.log(`Volume diameter: ${volDiam}`);
 
-  const FG_ICONS = ['dalek', 'check', 'mr_squiggle', 'tardis'];
+  const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
   const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
 
   const fgIconIndex = new Uint16Array(nNodes*6);
@@ -250,6 +251,7 @@ function main() {
   const shaderUniforms = {
     u_worldViewProjection: m4.identity(),
     u_view:           m4.identity(),
+    u_model: m4.identity(),
     u_diffuse: atlas
   };
 
@@ -271,15 +273,28 @@ function main() {
     // zoom: 1
   }
 
+  const scene = {
+    isDrawing: false,
+    xMouse: 0.0,
+    yMouse: 0.0,
+    xRot: 0.0,
+    yRot: 0.0,
+  };
+
   let cameraMatrix;
   let viewProjectionMatrix;
   function updateViewProjectionMatrix(copyViewMatrix) {
     // Compute the projection matrix
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    let modelMatrix = m4.identity();
+    modelMatrix = m4.xRotate(modelMatrix, scene.yRot);
+    modelMatrix = m4.yRotate(modelMatrix, scene.xRot);
+    console.log(`${scene.xRot} ${scene.yRot}`);
+    shaderUniforms.u_model = modelMatrix;
     const projectionMatrix =
       m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
     // Make a view matrix from the camera matrix.
-    const viewMatrix = m4.inverse(cameraMatrix, copyViewMatrix);
+    let viewMatrix = m4.inverse(cameraMatrix, copyViewMatrix);
     viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
   }
 
@@ -356,7 +371,32 @@ function main() {
     }
   }
 
-  canvas.addEventListener('wheel', (e) => {
+  canvas.addEventListener('mousedown', e => {
+    e.preventDefault();
+    scene.xMouse = e.offsetX;
+    scene.yMouse = e.offsetY;
+    scene.isDrawing = true;
+    console.log(`x0=${scene.xMouse} y0=${scene.yMouse}`);
+  });
+
+  canvas.addEventListener('mouseup', e => {
+    scene.isDrawing = false;
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    e.preventDefault();
+    if (scene.isDrawing) {
+      scene.xRot += (e.offsetX - scene.xMouse) / 500;
+      scene.yRot += (e.offsetY - scene.yMouse) / 500;
+
+      scene.xMouse = e.offsetX;
+      scene.yMouse = e.offsetY;
+      // console.log(`xdelta=${scene.xdelta} ydelta=${scene.ydelta}`);
+      requestAnimationFrame(drawScene);
+    }
+  });
+
+  canvas.addEventListener('wheel', e => {
     e.preventDefault();
 
     // Copy Constellation's algorithm.
