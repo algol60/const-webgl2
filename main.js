@@ -10,15 +10,13 @@ in vec2 a_corners;
 in vec2 a_fgCoord;
 // in vec2 a_bgCoord;
 in vec3 a_color;
-in uint a_fgIconIndex;
-in uint a_bgIconIndex;
+in uvec2 a_iconsIndex;
 in uvec4 a_decorIndex;
 
 out vec2 v_fgCoord;
 // out vec2 v_bgCoord;
 out vec3 v_color;
-flat out uint fgIcon;
-flat out uint bgIcon;
+flat out uvec2 iconsIndex;
 flat out uvec4 decorIndex;
 
 void main() {
@@ -26,7 +24,7 @@ void main() {
   // v_bgCoord = a_bgCoord;
   v_color = a_color;
 
-  vec4 position =  u_model * a_position;
+  vec4 position = u_model * a_position;
   // position.xy += a_corners;
 
   // billboarding
@@ -36,8 +34,7 @@ void main() {
 
   gl_Position = u_worldViewProjection * position;
 
-  fgIcon = a_fgIconIndex;
-  bgIcon = a_bgIconIndex;
+  iconsIndex = a_iconsIndex;
   decorIndex = a_decorIndex;
 }
 `;
@@ -48,8 +45,7 @@ precision highp float;
 in vec2 v_fgCoord;
 // in vec2 v_bgCoord;
 in vec3 v_color;
-flat in uint fgIcon;
-flat in uint bgIcon;
+flat in uvec2 iconsIndex;
 flat in uvec4 decorIndex;
 
 uniform sampler2D u_diffuse;
@@ -70,8 +66,8 @@ void main() {
   // Instead, we get the icon index, and figure out the icon coordinates here.
   // This saves bytes for each icon.
   //
-  vec2 bgxy = iconxy(bgIcon);
-  vec2 fgxy = iconxy(fgIcon);
+  vec2 fgxy = iconxy(iconsIndex[0]);
+  vec2 bgxy = iconxy(iconsIndex[1]);
   vec2 size = vec2(0.125, 0.125);
 
   // Start with the foreground icon.
@@ -182,8 +178,7 @@ function main() {
   const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
   const DEC_ICONS = ['true', 'false', 'australia', 'china', 'russia', 'ukraine']
 
-  const fgIconIndex = new Uint16Array(nNodes*6);
-  const bgIconIndex = new Uint16Array(nNodes*6);
+  const iconsIndex = new Uint16Array(nNodes*6 * 2); // foreground + background icons
   const decorIndex = new Uint16Array(nNodes*6 * 4); // Four decorators per node.
 
   let nodeIx = 0;
@@ -221,21 +216,19 @@ function main() {
     const fg_name = FG_ICONS[nodeIx%FG_ICONS.length];
     const fgTexIndex = textureIndex(fg_name);
     push_tex_coords(fgTex, fgTexIndex);
-    // fgIconIndex[i] = textureIndex(fg_name);
 
     // Node background icons.
     //
     const bg_name = BG_ICONS[nodeIx%BG_ICONS.length];
     const bgTexIndex = textureIndex(bg_name);
     // push_tex_coords(bgTex, bgTexIndex);
-    // bgIconIndex[i] = textureIndex(fg_name);
 
     // Decorator icons.
     //
     const decor_name = DEC_ICONS[nodeIx%DEC_ICONS.length];
     const decorIx = textureIndex(decor_name);
-    const dectl = textureIndex('australia');
-    const dectr = textureIndex('china');
+    const dectl = textureIndex('true');
+    const dectr = textureIndex('false');
     const decbl = textureIndex('ukraine');
     const decbr = textureIndex('russia');
 
@@ -245,8 +238,8 @@ function main() {
     for (let vx=0; vx<6; vx++) {
       pos.push(node.x, node.y, node.z);
       color.push(red, gre, blu);
-      fgIconIndex[nodeIx*6+vx] = fgTexIndex;
-      bgIconIndex[nodeIx*6+vx] = bgTexIndex;
+      iconsIndex[nodeIx*6*2+vx*2+0] = fgTexIndex;
+      iconsIndex[nodeIx*6*2+vx*2+1] = bgTexIndex;
 
       const corner = nodeIx%4;
       decorIndex[nodeIx*6*4+vx*4+0] = corner>=0 ? dectl : 65535;
@@ -291,9 +284,8 @@ function main() {
     fgCoord:  {numComponents:2, data:fgTex},
     // bgCoord:  {numComponents:2, data:bgTex},
     color:    {numComponents:3, data:color},
-    fgIconIndex: {numComponents:1, data:fgIconIndex},
-    bgIconIndex: {numComponents:1, data:bgIconIndex},
-    decorIndex: {numComponents:4, data:decorIndex, type:gl.UNSIGNED_SHORT}
+    iconsIndex: {numComponents:2, data:iconsIndex},
+    decorIndex: {numComponents:4, data:decorIndex}
     // indices:  {numComponents:3, data:ind},
   };
   const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
@@ -348,10 +340,12 @@ function main() {
   function updateViewProjectionMatrix(copyViewMatrix) {
     // Compute the projection matrix
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+
     let modelMatrix = m4.identity();
     modelMatrix = m4.xRotate(modelMatrix, scene.yRot);
     modelMatrix = m4.yRotate(modelMatrix, scene.xRot);
     shaderUniforms.u_model = modelMatrix;
+
     const projectionMatrix =
       m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
     // Make a view matrix from the camera matrix.
@@ -449,10 +443,9 @@ function main() {
     if (scene.isDrawing) {
       scene.xRot += (e.offsetX - scene.xMouse) / 500;
       scene.yRot += (e.offsetY - scene.yMouse) / 500;
-
       scene.xMouse = e.offsetX;
       scene.yMouse = e.offsetY;
-      // console.log(`xdelta=${scene.xdelta} ydelta=${scene.ydelta}`);
+
       requestAnimationFrame(drawScene);
     }
   });
