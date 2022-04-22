@@ -101,7 +101,7 @@ function convertZoomPointToDirection(canvasW, canvasH, clientX, clientY) {
 
 // These names must match the list of names in make_atlas.py.
 //
-const names = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis', 'australia', 'china', 'russia', 'ukraine', 'check',
+const names = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis', 'australia', 'china', 'russia', 'ukraine', 'check', 'true', 'false',
 'flat_circle', 'flat_square', 'round_circle', 'round_square', 'transparent'];
 
 function textureIndex(name) {

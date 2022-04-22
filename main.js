@@ -12,12 +12,14 @@ in vec2 a_fgCoord;
 in vec3 a_color;
 in uint a_fgIconIndex;
 in uint a_bgIconIndex;
+in uvec4 a_decorIndex;
 
 out vec2 v_fgCoord;
 // out vec2 v_bgCoord;
 out vec3 v_color;
 flat out uint fgIcon;
 flat out uint bgIcon;
+flat out uvec4 decorIndex;
 
 void main() {
   v_fgCoord = a_fgCoord;
@@ -36,6 +38,7 @@ void main() {
 
   fgIcon = a_fgIconIndex;
   bgIcon = a_bgIconIndex;
+  decorIndex = a_decorIndex;
 }
 `;
 
@@ -47,10 +50,18 @@ in vec2 v_fgCoord;
 in vec3 v_color;
 flat in uint fgIcon;
 flat in uint bgIcon;
+flat in uvec4 decorIndex;
 
 uniform sampler2D u_diffuse;
 
 out vec4 outColor;
+
+// The icons are in a n 8x8 texture.
+// Given an icon index, return the position of the icon in the texture.
+//
+vec2 iconxy(uint ix) {
+  return vec2(float(ix % 8u), float(ix / 8u)) / 8.0;
+}
 
 void main() {
 
@@ -59,10 +70,14 @@ void main() {
   // Instead, we get the icon index, and figure out the icon coordinates here.
   // This saves bytes for each icon.
   //
-  vec2 bgxy = vec2(bgIcon%8u, bgIcon/8u) / 8.0;
-  vec2 fgxy = vec2(fgIcon%8u, fgIcon/8u) / 8.0;
+  vec2 bgxy = iconxy(bgIcon);
+  vec2 fgxy = iconxy(fgIcon);
   vec2 size = vec2(0.125, 0.125);
 
+  // Start with the foreground icon.
+  // Only use the background icon when the foreground is transparent.
+  //
+  outColor = vec4(0, 0, 0, 0);
   vec4 color = texture(u_diffuse, fgxy + size * v_fgCoord);
   if (color.a>=0.1) {
     outColor = color;
@@ -73,24 +88,53 @@ void main() {
     }
   }
 
+  // Now do the decorators.
+  // Value 65535 is the "no decorator" value.
+  //
+
   // Testing: overlay the same icon; actually, get it from another index.
   float decoratorRadius = 3.0;
   float inv = 1.0 / decoratorRadius;
-  if (v_fgCoord.x<inv && v_fgCoord.y<inv) {
-    vec4 dColor = texture(u_diffuse, fgxy + size*decoratorRadius * v_fgCoord);
+
+  uint tl = decorIndex[0];
+  uint tr = decorIndex[1];
+  uint bl = decorIndex[2];
+  uint br = decorIndex[3];
+
+  if (tl!=65535u && v_fgCoord.x<inv && v_fgCoord.y<inv) {
+    vec2 xy = iconxy(tl);
+    vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * v_fgCoord);
     if (dColor.a>=0.1) {
       outColor = dColor;
     }
   }
 
-  if (v_fgCoord.x>(1.0-inv) && v_fgCoord.y>(1.0-inv)) {
-    vec4 dColor = texture(u_diffuse, fgxy + size*decoratorRadius * (v_fgCoord-(1.0-inv)));
+  if (tr!=65535u && v_fgCoord.x>=(1.0-inv) && v_fgCoord.y<inv) {
+    vec2 xy = iconxy(tr);
+    vec2 coord = vec2(v_fgCoord.x-(1.0-inv), v_fgCoord.y);
+    vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
     if (dColor.a>=0.1) {
       outColor = dColor;
     }
   }
 
-  // TODO bottom left, top right.
+  if (bl!=65535u && v_fgCoord.x<inv && v_fgCoord.y>=(1.0-inv)) {
+    vec2 xy = iconxy(bl);
+    vec2 coord = vec2(v_fgCoord.x, v_fgCoord.y-(1.0-inv));
+    vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
+    if (dColor.a>=0.1) {
+      outColor = dColor;
+    }
+  }
+
+  if (br!=65535u && v_fgCoord.x>=(1.0-inv) && v_fgCoord.y>=(1.0-inv)) {
+    vec2 xy = iconxy(br);
+    vec2 coord = v_fgCoord-(1.0-inv);
+    vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
+    if (dColor.a>=0.1) {
+      outColor = dColor;
+    }
+  }
 
   if (outColor.a<0.1) {
     discard;
@@ -136,11 +180,13 @@ function main() {
 
   const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
   const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
+  const DEC_ICONS = ['true', 'false', 'australia', 'china', 'russia', 'ukraine']
 
   const fgIconIndex = new Uint16Array(nNodes*6);
   const bgIconIndex = new Uint16Array(nNodes*6);
+  const decorIndex = new Uint16Array(nNodes*6 * 4); // Four decorators per node.
 
-  let i = 0;
+  let nodeIx = 0;
   for (const node of sphereBuilder(nNodes)) {
     // ind.push(0, 1, 2, 1, 2, 3);
 
@@ -172,30 +218,45 @@ function main() {
 
     // Node foreground icons.
     //
-    const fg_name = FG_ICONS[i%FG_ICONS.length];
+    const fg_name = FG_ICONS[nodeIx%FG_ICONS.length];
     const fgTexIndex = textureIndex(fg_name);
     push_tex_coords(fgTex, fgTexIndex);
     // fgIconIndex[i] = textureIndex(fg_name);
 
     // Node background icons.
     //
-    const bg_name = BG_ICONS[i%BG_ICONS.length];
-    const bgTexIndex = textureIndex(fg_name);
+    const bg_name = BG_ICONS[nodeIx%BG_ICONS.length];
+    const bgTexIndex = textureIndex(bg_name);
     // push_tex_coords(bgTex, bgTexIndex);
     // bgIconIndex[i] = textureIndex(fg_name);
+
+    // Decorator icons.
+    //
+    const decor_name = DEC_ICONS[nodeIx%DEC_ICONS.length];
+    const decorIx = textureIndex(decor_name);
+    const dectl = textureIndex('australia');
+    const dectr = textureIndex('china');
+    const decbl = textureIndex('ukraine');
+    const decbr = textureIndex('russia');
 
     // Push a central vertex for each triangle.
     // The vertex shader will set the position for each corner.
     //
-    for(let vx=0; vx<6; vx++) {
+    for (let vx=0; vx<6; vx++) {
       pos.push(node.x, node.y, node.z);
       color.push(red, gre, blu);
-      fgIconIndex[i*6+vx] = fgTexIndex;
-      bgIconIndex[i*6+vx] = bgTexIndex;
+      fgIconIndex[nodeIx*6+vx] = fgTexIndex;
+      bgIconIndex[nodeIx*6+vx] = bgTexIndex;
+
+      const corner = nodeIx%4;
+      decorIndex[nodeIx*6*4+vx*4+0] = corner>=0 ? dectl : 65535;
+      decorIndex[nodeIx*6*4+vx*4+1] = corner>=1 ? dectr : 65535;
+      decorIndex[nodeIx*6*4+vx*4+2] = corner>=2 ? decbl : 65535;
+      decorIndex[nodeIx*6*4+vx*4+3] = corner>=3 ? decbr : 65535;
     }
 
     // ind.push(0, 1, 2, 1, 2, 3);
-    i++;
+    nodeIx++;
   }
 
   const sceneRadius = coordsRadius(pos);
@@ -231,7 +292,8 @@ function main() {
     // bgCoord:  {numComponents:2, data:bgTex},
     color:    {numComponents:3, data:color},
     fgIconIndex: {numComponents:1, data:fgIconIndex},
-    bgIconIndex: {numComponents:1, data:bgIconIndex}
+    bgIconIndex: {numComponents:1, data:bgIconIndex},
+    decorIndex: {numComponents:4, data:decorIndex, type:gl.UNSIGNED_SHORT}
     // indices:  {numComponents:3, data:ind},
   };
   const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
@@ -289,7 +351,6 @@ function main() {
     let modelMatrix = m4.identity();
     modelMatrix = m4.xRotate(modelMatrix, scene.yRot);
     modelMatrix = m4.yRotate(modelMatrix, scene.xRot);
-    console.log(`${scene.xRot} ${scene.yRot}`);
     shaderUniforms.u_model = modelMatrix;
     const projectionMatrix =
       m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
