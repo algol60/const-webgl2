@@ -3,7 +3,7 @@ import {CAMERA_FAR, CAMERA_NEAR, FIELD_OF_VIEW, convertZoomPointToDirection, coo
 const vs = `#version 300 es
 uniform mat4 u_worldViewProjection;
 uniform mat4 u_view;
-uniform mat4 u_model;
+// uniform mat4 u_model;
 
 in vec4 a_position;
 in vec2 a_corners;
@@ -26,7 +26,8 @@ void main() {
   // v_bgCoord = a_bgCoord;
   v_color = a_color;
 
-  vec4 position =  u_model * a_position;
+  // vec4 position =  u_model * a_position;
+  vec4 position = a_position;
   // position.xy += a_corners;
 
   // billboarding
@@ -313,7 +314,7 @@ function main() {
   const shaderUniforms = {
     u_worldViewProjection: m4.identity(),
     u_view:           m4.identity(),
-    u_model: m4.identity(),
+    // u_model: m4.identity(),
     u_diffuse: atlas
   };
 
@@ -348,10 +349,10 @@ function main() {
   function updateViewProjectionMatrix(copyViewMatrix) {
     // Compute the projection matrix
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    let modelMatrix = m4.identity();
-    modelMatrix = m4.xRotate(modelMatrix, scene.yRot);
-    modelMatrix = m4.yRotate(modelMatrix, scene.xRot);
-    shaderUniforms.u_model = modelMatrix;
+    // let modelMatrix = m4.identity();
+    // modelMatrix = m4.xRotate(modelMatrix, scene.yRot);
+    // modelMatrix = m4.yRotate(modelMatrix, scene.xRot);
+    // shaderUniforms.u_model = modelMatrix;
     const projectionMatrix =
       m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
     // Make a view matrix from the camera matrix.
@@ -385,6 +386,13 @@ function main() {
     }
 
     cameraMatrix = m4.lookAt(camera.eye, camera.target, camera.up)
+    const cx = cameraMatrix[12];
+    const cy = cameraMatrix[13];
+    const cz = cameraMatrix[14];
+    cameraMatrix = m4.translate(cameraMatrix, -cx, -cy, -cz);
+    cameraMatrix = m4.xRotate(cameraMatrix, -scene.yRot);
+    cameraMatrix = m4.yRotate(cameraMatrix, -scene.xRot);
+    cameraMatrix = m4.translate(cameraMatrix, cx, cy, cz);
 
     // // Make a view matrix from the camera matrix.
     // const viewMatrix = m4.inverse(cameraMatrix);//, shaderUniforms.u_view);
