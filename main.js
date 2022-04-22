@@ -42,6 +42,9 @@ void main() {
 const fs = `#version 300 es
 precision highp float;
 
+const uint NO_ICON = 65535u;
+const float HALF_PIXEL = (0.5 / (256.0 * 8.0));
+
 in vec2 v_fgCoord;
 // in vec2 v_bgCoord;
 in vec3 v_color;
@@ -56,7 +59,7 @@ out vec4 outColor;
 // Given an icon index, return the position of the icon in the texture.
 //
 vec2 iconxy(uint ix) {
-  return vec2(float(ix % 8u), float(ix / 8u)) / 8.0;
+  return vec2(float(ix % 8u), float(ix / 8u)) / 8.0 + vec2(HALF_PIXEL, -2.0*HALF_PIXEL);
 }
 
 void main() {
@@ -68,7 +71,7 @@ void main() {
   //
   vec2 fgxy = iconxy(iconsIndex[0]);
   vec2 bgxy = iconxy(iconsIndex[1]);
-  vec2 size = vec2(0.125, 0.125);
+  const vec2 size = vec2(0.125, 0.125);
 
   // Start with the foreground icon.
   // Only use the background icon when the foreground is transparent.
@@ -85,19 +88,18 @@ void main() {
   }
 
   // Now do the decorators.
-  // Value 65535 is the "no decorator" value.
   //
 
   // Testing: overlay the same icon; actually, get it from another index.
-  float decoratorRadius = 3.0;
-  float inv = 1.0 / decoratorRadius;
+  const float decoratorRadius = 3.0;
+  const float inv = 1.0 / decoratorRadius;
 
   uint tl = decorIndex[0];
   uint tr = decorIndex[1];
   uint bl = decorIndex[2];
   uint br = decorIndex[3];
 
-  if (tl!=65535u && v_fgCoord.x<inv && v_fgCoord.y<inv) {
+  if (tl!=NO_ICON && v_fgCoord.x<inv && v_fgCoord.y<inv) {
     vec2 xy = iconxy(tl);
     vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * v_fgCoord);
     if (dColor.a>=0.1) {
@@ -105,7 +107,7 @@ void main() {
     }
   }
 
-  if (tr!=65535u && v_fgCoord.x>=(1.0-inv) && v_fgCoord.y<inv) {
+  if (tr!=NO_ICON && v_fgCoord.x>=(1.0-inv) && v_fgCoord.y<inv) {
     vec2 xy = iconxy(tr);
     vec2 coord = vec2(v_fgCoord.x-(1.0-inv), v_fgCoord.y);
     vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
@@ -114,7 +116,7 @@ void main() {
     }
   }
 
-  if (bl!=65535u && v_fgCoord.x<inv && v_fgCoord.y>=(1.0-inv)) {
+  if (bl!=NO_ICON && v_fgCoord.x<inv && v_fgCoord.y>=(1.0-inv)) {
     vec2 xy = iconxy(bl);
     vec2 coord = vec2(v_fgCoord.x, v_fgCoord.y-(1.0-inv));
     vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
@@ -123,7 +125,7 @@ void main() {
     }
   }
 
-  if (br!=65535u && v_fgCoord.x>=(1.0-inv) && v_fgCoord.y>=(1.0-inv)) {
+  if (br!=NO_ICON && v_fgCoord.x>=(1.0-inv) && v_fgCoord.y>=(1.0-inv)) {
     vec2 xy = iconxy(br);
     vec2 coord = v_fgCoord-(1.0-inv);
     vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
@@ -139,18 +141,6 @@ void main() {
 `;
 
 function main() {
-  const rand = function (min, max) {
-    if (max === undefined) {
-      max = min;
-      min = 0;
-    }
-    return min + Math.random() * (max - min);
-  };
-
-  const randInt = function (range) {
-    return Math.floor(Math.random() * range);
-  };
-
   const pos = []; // node centre positions
   const cor = []; // node corners
   const fgTex = []; // Foreground icon texture coordinates
@@ -162,17 +152,8 @@ function main() {
 
   // How many nodes to draw?
   //
-  const nNodes = 1_000;
+  const nNodes = 1000;
   console.log(`nNodes: ${nNodes}`);
-
-  // How big are the nodes?
-  //
-  const ndiam = 1;//0;
-
-  // How big is the volume we draw the nodes in?
-  //
-  const volDiam = ndiam/2 * Math.sqrt(nNodes);
-  console.log(`Volume diameter: ${volDiam}`);
 
   const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
   const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
@@ -189,7 +170,9 @@ function main() {
     const gre = Math.random();
     const blu = Math.random();
 
-    const r = ndiam/2;
+    // Node radii: make an occasional node bigger.
+    //
+    const r = (nodeIx>3 && (nodeIx%19==0)) ? 1.5 : 0.5;
     cor.push(-r,-r, r,-r, -r,r,
                     r,-r, -r,r, r,r);
 
@@ -226,7 +209,6 @@ function main() {
     // Decorator icons.
     //
     const decor_name = DEC_ICONS[nodeIx%DEC_ICONS.length];
-    const decorIx = textureIndex(decor_name);
     const dectl = textureIndex('true');
     const dectr = textureIndex('false');
     const decbl = textureIndex('ukraine');
@@ -463,7 +445,7 @@ function main() {
 
     // Invert the wheel direction and make the movement smaller.
     //
-    const d = -Math.sign(e.deltaY) / 32.0;
+    const d = -Math.sign(e.deltaY) / (e.ctrlKey ? 512.0 : 32.0);
 
     const norm = m4.normalize(zoomDirection);
     norm[0] *= d;

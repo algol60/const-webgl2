@@ -15,6 +15,9 @@ To see the demo, start your favourite local web server in the root directory, an
 python -m http.server
 ```
 
+* Left button rotates the graph. Note that the nodes always face the camera.
+* Mouse wheel zooms to the cursor; use Ctrl to slow the zoom down.
+
 Then browse to `http://localhost:8000/example1.html` in your favourite browser.
 
 ## Adjustments
@@ -41,7 +44,7 @@ time = time * 0.001;
 
 - More complicated shaders to match Constellation.
 - Add lines, blazes, etc.
-- Use mouse interaction to get a better idea of how user interaction feels.
+- Better (consistent) mouse interaction. Move the camera, or use a model matrix?
 - Selection, dragging, etc.
 - Use indexing to save buffer memory.
 - For x,y,z use a texture buffer and gl_VertexID/texelFetch() (like Constellation).
