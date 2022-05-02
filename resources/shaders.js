@@ -1,39 +1,41 @@
 const nodeVs = `#version 300 es
+precision highp float;
+
 uniform mat4 u_worldViewProjection;
 uniform mat4 u_view;
 uniform mat4 u_model;
 
-in vec4 a_position;
-in vec2 a_corners;
-in vec2 a_fgCoord;
-// in vec2 a_bgCoord;
-in vec3 a_color;
-in uvec2 a_iconsIndex;
-in uvec4 a_decorIndex;
+in vec3 position;
+in vec2 corners;
+in vec2 fgCoord;
+// in vec2 bgCoord;
+in vec3 color;
+in uvec2 iconsIndex;
+in uvec4 decorIndex;
 
 out vec2 v_fgCoord;
 // out vec2 v_bgCoord;
 out vec3 v_color;
-flat out uvec2 iconsIndex;
-flat out uvec4 decorIndex;
+flat out uvec2 f_iconsIndex;
+flat out uvec4 f_decorIndex;
 
 void main() {
-  v_fgCoord = a_fgCoord;
-  // v_bgCoord = a_bgCoord;
-  v_color = a_color;
+  v_fgCoord = fgCoord;
+  // v_bgCoord = bgCoord;
+  v_color = color;
 
-  vec4 position = u_model * a_position;
-  // position.xy += a_corners;
+  vec4 mposition = u_model * vec4(position, 1);
+  // position.xy += corners;
 
   // billboarding
   vec3 cameraRight = vec3(u_view[0].x, u_view[1].x, u_view[2].x);
   vec3 cameraUp = vec3(u_view[0].y, u_view[1].y, u_view[2].y);
-  position.xyz += cameraRight * a_corners.x + cameraUp * a_corners.y;
+  mposition.xyz += cameraRight * corners.x + cameraUp * corners.y;
 
-  gl_Position = u_worldViewProjection * position;
+  gl_Position = u_worldViewProjection * mposition;
 
-  iconsIndex = a_iconsIndex;
-  decorIndex = a_decorIndex;
+  f_iconsIndex = iconsIndex;
+  f_decorIndex = decorIndex;
 }
 `;
 
@@ -46,8 +48,8 @@ const float HALF_PIXEL = (0.5 / (256.0 * 8.0));
 in vec2 v_fgCoord;
 // in vec2 v_bgCoord;
 in vec3 v_color;
-flat in uvec2 iconsIndex;
-flat in uvec4 decorIndex;
+flat in uvec2 f_iconsIndex;
+flat in uvec4 f_decorIndex;
 
 uniform sampler2D u_diffuse;
 
@@ -67,8 +69,8 @@ void main() {
   // Instead, we get the icon index, and figure out the icon coordinates here.
   // This saves bytes for each icon.
   //
-  vec2 fgxy = iconxy(iconsIndex[0]);
-  vec2 bgxy = iconxy(iconsIndex[1]);
+  vec2 fgxy = iconxy(f_iconsIndex[0]);
+  vec2 bgxy = iconxy(f_iconsIndex[1]);
   const vec2 size = vec2(0.125, 0.125);
 
   // Start with the foreground icon.
@@ -92,10 +94,10 @@ void main() {
   const float decoratorRadius = 3.0;
   const float inv = 1.0 / decoratorRadius;
 
-  uint tl = decorIndex[0];
-  uint tr = decorIndex[1];
-  uint bl = decorIndex[2];
-  uint br = decorIndex[3];
+  uint tl = f_decorIndex[0];
+  uint tr = f_decorIndex[1];
+  uint bl = f_decorIndex[2];
+  uint br = f_decorIndex[3];
 
   if (tl!=NO_ICON && v_fgCoord.x<inv && v_fgCoord.y<inv) {
     vec2 xy = iconxy(tl);

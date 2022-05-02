@@ -7123,6 +7123,7 @@ function floatAttribSetter(gl, index) {
           index, b.numComponents || b.size, b.type || FLOAT$3, b.normalize || false, b.stride || 0, b.offset || 0);
       if (b.divisor !== undefined) {
         gl.vertexAttribDivisor(index, b.divisor);
+        console.log('VAD', index, b.divisor);
       }
     }
   };

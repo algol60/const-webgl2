@@ -6,29 +6,40 @@ const lineVertices = [
 ];
 
 const vs = `#version 300 es
+precision highp float;
 uniform mat4 u_worldViewProjection;
 uniform mat4 u_view;
 uniform mat4 u_model;
 
-in vec3 quad;
-in vec3 a_position;
+in vec4 position;
+in vec3 hue;
+
+out vec3 f_color;
 
 void main() {
-  vec4 offsetPosition = vec4(quad + a_position, 1.0);
-  vec4 position = u_model * offsetPosition;
-  gl_Position = u_worldViewProjection * position;
+  vec4 mposition = u_model * position;
+  gl_Position = u_worldViewProjection * mposition;
+  f_color = hue;
 }
 `;
 
 const fs = `#version 300 es
 precision highp float;
 
+in vec3 f_color;
+
 out vec4 outColor;
 
 void main() {
-  outColor = vec4(1.0, 0.0, 0.0, 1.0);
+  // outColor = vec4(1.0, 0.0, 0.0, 1.0);
+  outColor = vec4(f_color, 1.0);
 }
 `;
+
+function err(msg) {
+  console.log('ERRR', msg);
+  alert(msg);
+}
 
 class Transactions {
   constructor(n) {
@@ -42,12 +53,20 @@ class Transactions {
    * @param {*} lineIxs Indexes into nodes of pairs of line ends
    */
   build(gl, nodes, lineIxs) {
+    // twgl.addExtensionsToContext(gl);
+    if (!gl.drawArraysInstanced || !gl.createVertexArray) {
+      alert("need drawArraysInstanced and createVertexArray"); // eslint-disable-line
+      return;
+    }
+
     const lineEnds = [];
     const color = [];
     this.nInstances = lineIxs.length;
-    for(let ix=0; ix<lineIxs.length; ix+=2) {
-      const ni = nodes[ix];
-      const nj = nodes[ix+1];
+    console.log('line ixs', lineIxs);
+    for(let ix=0; ix<this.nInstances; ix+=2) {
+      const ni = nodes[lineIxs[ix]];
+      const nj = nodes[lineIxs[ix+1]];
+      console.log(ix, ni, nj);
       lineEnds.push(
         ni.x-0.5, ni.y-0.5, ni.z,
         ni.x+0.5, ni.y-0.5, ni.z,
@@ -60,42 +79,52 @@ class Transactions {
       const red = Math.random();
       const gre = Math.random();
       const blu = Math.random();
+      for(let ii=0; ii<3; ii++) {
       color.push(red, gre, blu);
+      // color.push(1, 0, 0);
+      // color.push(0, 0, 1);
+      }
     }
+    color.push(1,1,0);
+    color.push(0,0,1);
 
-    const arrays = {
-      lineEnds: {numComponents:3, data:lineEnds},
-      color: {numComponents:3, data:color, divisor:6}
+    this.arrays = {
+      position: {numComponents:3, data:lineEnds},
+      hue:    {numComponents:3, data:color, divisor:1}
     };
-
-    const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
-    console.log(bufferInfo);
+    console.log('tx arrays', this.arrays);
 
     this.program = twgl.createProgramFromSources(gl, [vs, fs]);
-    this.uniformSetters = twgl.createUniformSetters(gl, this.program);
-    this.attribSetters = twgl.createAttributeSetters(gl, this.program);
+    this.programInfo = twgl.createProgramInfoFromProgram(gl, this.program);
+    this.bufferInfo = twgl.createBufferInfoFromArrays(gl, this.arrays);
 
-    this.vao = twgl.createVAOFromBufferInfo(
-      gl, this.attribSetters, bufferInfo);
+    this.vertexArrayInfo = twgl.createVertexArrayInfo(gl, this.programInfo, this.bufferInfo);
   }
 
-  draw(gl, viewMatrix, modelMatrix, worldViewProjectionMatrix) {
-    const shaderUniforms = {
-      u_worldViewProjection: worldViewProjectionMatrix,
-      u_view:           viewMatrix,
-      u_model: modelMatrix
+  render(time, gl, viewMatrix, modelMatrix, worldViewProjectionMatrix) {
+    console.log(`draw lines at time ${time}`)
+    const uniforms = {
+      u_view:                 viewMatrix,
+      u_model:                modelMatrix,
+      u_worldViewProjection:  worldViewProjectionMatrix
     };
 
-    gl.useProgram(this.program);
+    console.log('tx prog', this.programInfo);
+    gl.useProgram(this.programInfo.program);
+    twgl.setBuffersAndAttributes(gl, this.programInfo, this.vertexArrayInfo);
+    twgl.setUniforms(this.programInfo, uniforms);
+    twgl.drawBufferInfo(gl, this.vertexArrayInfo, gl.TRIANGLES, this.vertexArrayInfo.numelements, 0, this.numInstances);
 
-    // Setup all the needed attributes.
-    gl.bindVertexArray(this.vao);
+    // gl.useProgram(this.program);
 
-    // Set the uniforms that are the same for all objects.
-    twgl.setUniforms(this.uniformSetters, shaderUniforms);
+    // // Setup all the needed attributes.
+    // gl.bindVertexArray(this.vao);
 
-    // gl.drawArrays(gl.TRIANGLES, 0, bufferInfo.numElements);
-    twgl.drawBufferInfo(gl, this.vao, gl.TRIANGLES, this.vao.numElements, 0, this.numInstances);
+    // // Set the uniforms that are the same for all objects.
+    // twgl.setUniforms(this.uniformSetters, shaderUniforms);
+
+    // // gl.drawArrays(gl.TRIANGLES, 0, bufferInfo.numElements);
+    // twgl.drawBufferInfo(gl, this.vao, gl.TRIANGLES, this.vao.numElements, 0, this.numInstances);
   }
 }
 

@@ -1,6 +1,7 @@
 import * as grut from './resources/graph-util.js';
 import * as shaders from './resources/shaders.js';
 import * as twgl from './resources/4.x/twgl-full.module.js';
+import * as transactions from './transactions.js';
 
 function main() {
   const pos = []; // node centre positions
@@ -14,7 +15,7 @@ function main() {
 
   // How many nodes to draw?
   //
-  const nNodes = 1000;
+  const nNodes = 10;
   console.log(`nNodes: ${nNodes}`);
 
   const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
@@ -26,8 +27,12 @@ function main() {
 
   const nodeRadius = (ix) => (nodeIx>3 && (nodeIx%19==0)) ? 1.5 : 0.5;
 
-  let nodeIx = 0;
+  const NODES = [];
   for (const node of grut.sphereBuilder(nNodes)) {
+    NODES.push(node);
+  }
+  let nodeIx = 0;
+  for (const node of NODES) {
     // ind.push(0, 1, 2, 1, 2, 3);
 
     const red = Math.random();
@@ -112,9 +117,9 @@ function main() {
     throw 'WebGL2 not available';
   }
 
-  // Tell the twgl to match position with a_position, n
-  // normal with a_normal etc..
-  twgl.setAttributePrefix("a_");
+  // // Tell the twgl to match position with a_position, n
+  // // normal with a_normal etc..
+  // twgl.setAttributePrefix("a_");
 
   // an indexed quad
   //   var arrays = {
@@ -135,7 +140,7 @@ function main() {
     // indices:  {numComponents:3, data:ind},
   };
   const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
-  console.log(bufferInfo);
+  console.log('vx', bufferInfo);
 
   // setup GLSL program
   const program = twgl.createProgramFromSources(gl, [shaders.nodeVs, shaders.nodeFs]);
@@ -199,10 +204,14 @@ function main() {
     viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
   }
 
+  const txs = new transactions.Transactions(99);
+  // txs.build(gl, NODES, [0,4, 1,5, 2,6, 3,7]);
+  txs.build(gl, NODES, [4,5, 5,6, 6,7, 7,8, 8,9]);
+
   // Draw the scene.
   function drawScene(time) {
-    console.log(`draw at time ${time}`)
-    time = time * 0.001;
+    console.log(`draw nodes at time ${time}`)
+    const time_d = time * 0.001;
 
     twgl.resizeCanvasToDisplaySize(gl.canvas);
 
@@ -220,8 +229,8 @@ function main() {
     //   m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
 
     if (spin) {
-      camera.eye[0] = Math.sin(time) * camDist;
-      camera.eye[2] = Math.cos(time) * camDist;
+      camera.eye[0] = Math.sin(time_d) * camDist;
+      camera.eye[2] = Math.cos(time_d) * camDist;
     }
 
     cameraMatrix = m4.lookAt(camera.eye, camera.target, camera.up)
@@ -266,6 +275,8 @@ function main() {
     // gl.drawElements(gl.TRIANGLES, bufferInfo.numElements, gl.UNSIGNED_SHORT, 0);
     gl.drawArrays(gl.TRIANGLES, 0, bufferInfo.numElements);
     // console.log(bufferInfo.numElements);
+
+    txs.render(time, gl, shaderUniforms.u_view, shaderUniforms.u_model, shaderUniforms.u_worldViewProjection);
 
     if (spin) {
       requestAnimationFrame(drawScene);
