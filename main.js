@@ -1,5 +1,6 @@
 import * as grut from './resources/graph-util.js';
 import * as shaders from './resources/shaders.js';
+import * as twgl from './resources/4.x/twgl-full.module.js';
 
 function main() {
   const pos = []; // node centre positions
