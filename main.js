@@ -15,7 +15,7 @@ function main() {
 
   // How many nodes to draw?
   //
-  const nNodes = 10;
+  const nNodes = 100;
   console.log(`nNodes: ${nNodes}`);
 
   const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
@@ -53,12 +53,6 @@ function main() {
     const HALF_PIXEL = (0.5 / (256 * 8));
 
     const push_tex_coords = (buf, img_ix) => {
-    //   const tex_lx = img_ix%8 / 8;
-    //   const tex_ty = Math.trunc(img_ix/8) / 8;
-    //   const tex_rx = tex_lx + TEXTURE_SIZE;
-    //   const tex_by = tex_ty + TEXTURE_SIZE;
-    //   buf.push(tex_rx,tex_by, tex_lx,tex_by, tex_rx,tex_ty,
-    //                           tex_lx,tex_by, tex_rx,tex_ty, tex_lx, tex_ty);
       buf.push(0,1, 1,1, 0,0,
                     1,1, 0,0, 1,0);
     };
@@ -204,9 +198,17 @@ function main() {
     viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
   }
 
-  const txs = new transactions.Transactions(99);
+  const txs = new transactions.Transactions();
   // txs.build(gl, NODES, [0,4, 1,5, 2,6, 3,7]);
-  txs.build(gl, NODES, [4,5, 5,6, 6,7, 7,8, 8,9]);
+  const lineIxs = [];
+  for (let i=4; i<nNodes-1; i+=Math.floor(nNodes/1000)+1) {
+    const vx0 = Math.floor(Math.random()*nNodes);
+    const vx1 = Math.floor(Math.random()*nNodes);
+    lineIxs.push(vx0, vx1);
+  }
+  console.log(`nTx: ${lineIxs.length/2}`);
+  // txs.build(gl, NODES, [4,5, 5,6, 6,7, 7,8, 8,9]);
+  txs.build(gl, NODES, lineIxs);
 
   // Draw the scene.
   function drawScene(time) {
@@ -219,8 +221,11 @@ function main() {
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
     gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.clearColor(0.1, 0.1, 0.15, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    // gl.clear(gl.COLOR_BUFFER_BIT);
     // gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
     // // Compute the projection matrix
