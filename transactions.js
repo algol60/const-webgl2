@@ -6,20 +6,34 @@ const lineVertices = [
 ];
 
 const vs = `#version 300 es
-precision highp float;
+// precision highp float;
 uniform mat4 u_worldViewProjection;
 uniform mat4 u_view;
 uniform mat4 u_model;
 
-in vec4 position;
+in vec3 position;
+in mat3 xyz;
 in vec3 hue;
 
 out vec3 f_color;
 
 void main() {
-  vec4 mposition = u_model * position;
+  // vx is the
+  vec3 vx = position * (gl_InstanceID%2==0?1.0:-1.0);
+  vec4 mposition = u_model * vec4(xyz[gl_VertexID]+vx, 1);
+  // vec4 mposition = u_model * vec4(position+xyz[gl_VertexID], 1);
+
+  // // billboarding
+  // vec3 cameraRight = vec3(u_view[0].x, u_view[1].x, u_view[2].x);
+  // vec3 cameraUp = vec3(u_view[0].y, u_view[1].y, u_view[2].y);
+  // mposition.xyz += cameraRight * corners.x + cameraUp * corners.y;
+
+
+
   gl_Position = u_worldViewProjection * mposition;
   f_color = hue;
+  // f_color = gl_InstanceID%2==0 ? vec3(1,1,0) : vec3(0,0,1);
+  // f_color = vec3(float(gl_InstanceID+1)/4.0, float(gl_InstanceID+1)/4.0, float(gl_InstanceID+1)/4.0);
 }
 `;
 
@@ -62,35 +76,34 @@ class Transactions {
     const lineEnds = [];
     const color = [];
     this.nInstances = lineIxs.length;
-    console.log('line ixs', lineIxs);
     for(let ix=0; ix<this.nInstances; ix+=2) {
       const ni = nodes[lineIxs[ix]];
       const nj = nodes[lineIxs[ix+1]];
-      console.log(ix, ni, nj);
       lineEnds.push(
-        ni.x-0.5, ni.y-0.5, ni.z,
-        ni.x+0.5, ni.y-0.5, ni.z,
-        nj.x-0.5, nj.y-0.5, nj.z,
+        ni.x-0.0, ni.y-0.0, ni.z,
+        ni.x+0.0, ni.y-0.0, ni.z,
+        nj.x-0.0, nj.y-0.0, nj.z,
 
-        ni.x+0.5, ni.y-0.5, ni.z,
-        nj.x-0.5, nj.y-0.5, nj.z,
-        nj.x+0.5, nj.y+0.5, nj.z
+        nj.x-0.0, nj.y-0.0, nj.z,
+        nj.x+0.0, nj.y+0.0, nj.z,
+        ni.x+0.0, ni.y-0.0, ni.z
       );
       const red = Math.random();
       const gre = Math.random();
       const blu = Math.random();
-      for(let ii=0; ii<3; ii++) {
       color.push(red, gre, blu);
-      // color.push(1, 0, 0);
-      // color.push(0, 0, 1);
-      }
     }
-    color.push(1,1,0);
-    color.push(0,0,1);
+
+    const pos = [
+      -0.0, -0.5, 0,
+      -0.0,  0.5, 0,
+       0.0,  0.5, 0
+    ]
 
     this.arrays = {
-      position: {numComponents:3, data:lineEnds},
-      hue:    {numComponents:3, data:color, divisor:1}
+      position: {numComponents:3, data:pos},
+      xyz: {numComponents:9, data:lineEnds, divisor:1},
+      hue:    {numComponents:3, data:color, divisor:2}
     };
     console.log('tx arrays', this.arrays);
 
@@ -113,7 +126,7 @@ class Transactions {
     gl.useProgram(this.programInfo.program);
     twgl.setBuffersAndAttributes(gl, this.programInfo, this.vertexArrayInfo);
     twgl.setUniforms(this.programInfo, uniforms);
-    twgl.drawBufferInfo(gl, this.vertexArrayInfo, gl.TRIANGLES, this.vertexArrayInfo.numelements, 0, this.numInstances);
+    twgl.drawBufferInfo(gl, this.vertexArrayInfo, gl.TRIANGLES, this.vertexArrayInfo.numelements, 0, this.nInstances);
 
     // gl.useProgram(this.program);
 
