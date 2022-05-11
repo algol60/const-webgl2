@@ -2,14 +2,9 @@ import * as grut from './resources/graph-util.js';
 import * as shaders from './resources/shaders.js';
 import * as twgl from './resources/4.x/twgl-full.module.js';
 import * as transactions from './transactions.js';
+import * as nodes from './nodes.js';
 
 function main() {
-  const pos = []; // node centre positions
-  const cor = []; // node corners
-  const fgTex = []; // Foreground icon texture coordinates
-  // const bgTex = []; // Background icon texture coordinates
-  const color = []; // node color
-  // const ind = [];
 
   const spin = false;
 
@@ -18,90 +13,19 @@ function main() {
   const nNodes = 100;
   console.log(`nNodes: ${nNodes}`);
 
-  const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
-  const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
-  const DEC_ICONS = ['true', 'false', 'australia', 'china', 'russia', 'ukraine']
-
   const iconsIndex = new Uint16Array(nNodes*6 * 2); // foreground + background icons
   const decorIndex = new Uint16Array(nNodes*6 * 4); // Four decorators per node.
-
-  const nodeRadius = (ix) => (nodeIx>3 && (nodeIx%19==0)) ? 1.5 : 0.5;
 
   const NODES = [];
   for (const node of grut.sphereBuilder(nNodes)) {
     NODES.push(node);
   }
-  let nodeIx = 0;
-  for (const node of NODES) {
-    // ind.push(0, 1, 2, 1, 2, 3);
 
-    const red = Math.random();
-    const gre = Math.random();
-    const blu = Math.random();
-
-    // Node radii: make an occasional node bigger.
-    //
-    const r = nodeRadius(nodeIx);
-    cor.push(-r,-r, r,-r, -r,r,
-                    r,-r, -r,r, r,r);
-
-    // The texture atlas contains 8x8 images, each image is 256x256.
-    // Same as Constellation, except it uses a 2D texture.
-    // Calculate leftx, topy, rightx, bottomy for texcoords.
-    //
-    const TEXTURE_SIZE = 0.125;
-    const HALF_PIXEL = (0.5 / (256 * 8));
-
-    const push_tex_coords = (buf, img_ix) => {
-      buf.push(0,1, 1,1, 0,0,
-                    1,1, 0,0, 1,0);
-    };
-
-    // Node foreground icons.
-    //
-    const fg_name = FG_ICONS[nodeIx%FG_ICONS.length];
-    const fgTexIndex = grut.textureIndex(fg_name);
-    push_tex_coords(fgTex, fgTexIndex);
-
-    // Node background icons.
-    //
-    const bg_name = BG_ICONS[nodeIx%BG_ICONS.length];
-    const bgTexIndex = grut.textureIndex(bg_name);
-    // push_tex_coords(bgTex, bgTexIndex);
-
-    // Decorator icons.
-    //
-    const decor_name = DEC_ICONS[nodeIx%DEC_ICONS.length];
-    const dectl = grut.textureIndex('true');
-    const dectr = grut.textureIndex('false');
-    const decbl = grut.textureIndex('ukraine');
-    const decbr = grut.textureIndex('russia');
-
-    // Push a central vertex for each triangle.
-    // The vertex shader will set the position for each corner.
-    //
-    for (let vx=0; vx<6; vx++) {
-      pos.push(node.x, node.y, node.z);
-      color.push(red, gre, blu);
-      iconsIndex[nodeIx*6*2+vx*2+0] = fgTexIndex;
-      iconsIndex[nodeIx*6*2+vx*2+1] = bgTexIndex;
-
-      const corner = nodeIx%4;
-      decorIndex[nodeIx*6*4+vx*4+0] = corner>=0 ? dectl : 65535;
-      decorIndex[nodeIx*6*4+vx*4+1] = corner>=1 ? dectr : 65535;
-      decorIndex[nodeIx*6*4+vx*4+2] = corner>=2 ? decbl : 65535;
-      decorIndex[nodeIx*6*4+vx*4+3] = corner>=3 ? decbr : 65535;
-    }
-
-    // ind.push(0, 1, 2, 1, 2, 3);
-    nodeIx++;
-  }
-
-  const sceneRadius = grut.coordsRadius(pos);
+  const sceneRadius = grut.coordsRadius(NODES);
   console.log(`Scene radius: ${sceneRadius}`);
 
-  // Get A WebGL context
-  /** @type {HTMLCanvasElement} */
+  // Get A WebGL2 context.
+  //
   const canvas = document.querySelector("#canvas");
 
   // No alpha in the backbuffer: see https://webglfundamentals.org/webgl/lessons/webgl-and-alpha.html.
@@ -110,39 +34,6 @@ function main() {
   if (!gl) {
     throw 'WebGL2 not available';
   }
-
-  // // Tell the twgl to match position with a_position, n
-  // // normal with a_normal etc..
-  // twgl.setAttributePrefix("a_");
-
-  // an indexed quad
-  //   var arrays = {
-  //      position: { numComponents: 3, data: [0, 0, 0, 10, 0, 0, 0, 10, 0, 10, 10, 0], },
-  //      texcoord: { numComponents: 2, data: [0, 0, 0, 1, 1, 0, 1, 1],                 },
-  //      indices:  { numComponents: 3, data: [0, 1, 2, 1, 2, 3],                       },
-  //   };
-
-  const arrays = {
-    position: {numComponents:3, data:pos},
-    corners:  {numComponents:2, data:cor},
-    // image:    {numComponents:1, data:img},
-    fgCoord:  {numComponents:2, data:fgTex},
-    // bgCoord:  {numComponents:2, data:bgTex},
-    color:    {numComponents:3, data:color},
-    iconsIndex: {numComponents:2, data:iconsIndex},
-    decorIndex: {numComponents:4, data:decorIndex}
-    // indices:  {numComponents:3, data:ind},
-  };
-  const bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
-  console.log('vx', bufferInfo);
-
-  // setup GLSL program
-  const program = twgl.createProgramFromSources(gl, [shaders.nodeVs, shaders.nodeFs]);
-  const uniformSetters = twgl.createUniformSetters(gl, program);
-  const attribSetters = twgl.createAttributeSetters(gl, program);
-
-  const vao = twgl.createVAOFromBufferInfo(
-    gl, attribSetters, bufferInfo);
 
   // Load the texture; do a redraw when the load is complete.
   //
@@ -154,12 +45,6 @@ function main() {
     u_model: m4.identity(),
     u_diffuse: atlas
   };
-
-  // var uniformsThatAreComputedForEachObject = {
-  //   u_worldViewProjection: m4.identity(),
-  //   u_world: m4.identity(),
-  //   u_worldInverseTranspose: m4.identity(),
-  // };
 
   // Set up to compute the camera's matrix using lookAt.
   //
@@ -198,6 +83,13 @@ function main() {
     viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
   }
 
+  // Nodes.
+  //
+  const vxs = new nodes.Nodes();
+  vxs.build(gl, NODES);
+
+  // Transactions.
+  //
   const txs = new transactions.Transactions();
   // txs.build(gl, NODES, [0,4, 1,5, 2,6, 3,7]);
   const lineIxs = [];
@@ -249,37 +141,11 @@ function main() {
     const worldMatrix = m4.identity();
     m4.multiply(viewProjectionMatrix, worldMatrix, shaderUniforms.u_worldViewProjection);
 
-    gl.useProgram(program);
+    // // Draw the geometry.
+    // // gl.drawElements(gl.TRIANGLES, bufferInfo.numElements, gl.UNSIGNED_SHORT, 0);
+    // gl.drawArrays(gl.TRIANGLES, 0, bufferInfo.numElements);
 
-    // Setup all the needed attributes.
-    gl.bindVertexArray(vao);
-
-    // Set the uniforms that are the same for all objects.
-    twgl.setUniforms(uniformSetters, shaderUniforms);
-
-    // // Draw objects
-
-    // Compute a position for this object based on the time.
-    // var worldMatrix = m4.identity();
-    // worldMatrix = m4.yRotate(worldMatrix, object.yRotation * time);
-    // worldMatrix = m4.xRotate(worldMatrix, object.xRotation * time);
-    // worldMatrix = m4.translate(worldMatrix, 0, 0, object.radius,
-    //   uniformsThatAreComputedForEachObject.u_world);
-
-    // // Multiply the matrices.
-    // m4.multiply(viewProjectionMatrix, worldMatrix, uniformsThatAreComputedForEachObject.u_worldViewProjection);
-    // m4.transpose(m4.inverse(worldMatrix), uniformsThatAreComputedForEachObject.u_worldInverseTranspose);
-
-    // // Set the uniforms we just computed
-    // twgl.setUniforms(uniformSetters, uniformsThatAreComputedForEachObject);
-
-    // // Set the uniforms that are specific to the this object.
-    // twgl.setUniforms(uniformSetters, object.materialUniforms);
-
-    // Draw the geometry.
-    // gl.drawElements(gl.TRIANGLES, bufferInfo.numElements, gl.UNSIGNED_SHORT, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, bufferInfo.numElements);
-    // console.log(bufferInfo.numElements);
+    vxs.render(time, gl, shaderUniforms.u_view, shaderUniforms.u_model, shaderUniforms.u_worldViewProjection);
 
     txs.render(time, gl, shaderUniforms.u_view, shaderUniforms.u_model, shaderUniforms.u_worldViewProjection);
 

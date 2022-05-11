@@ -16,15 +16,43 @@ const MINIMUM_CAMERA_DISTANCE = 6;
  * Put four nodes in a square in the middle.
  */
 function* sphereBuilder(n) {
+  const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
+  const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
+  // const DEC_ICONS = ['true', 'false', 'australia', 'china', 'russia', 'ukraine']
+  const dectl = textureIndex('true');
+  const dectr = textureIndex('false');
+  const decbl = textureIndex('ukraine');
+  const decbr = textureIndex('russia');
+
   n = Math.max(4, n) - 4;
   console.log(`Sphere nodes: ${n}`);
 
   // Four nodes in the middle...
   //
-  yield {x:-0.5, y:0.5, z:0.0};
-  yield {x:0.5, y:0.5, z:0.0};
-  yield {x:-0.5, y:-0.5, z:0.0};
-  yield {x:0.5, y:-0.5, z:0.0};
+  yield {
+    x:-0.5, y:0.5, z:0.0, r:0.5,
+    red:1, gre:0, blu:0,
+    fg_tex:textureIndex('dalek'), bg_tex:textureIndex('round_circle'),
+    tl:dectl
+  };
+  yield {
+    x:0.5, y:0.5, z:0.0, r:0.5,
+    red:0, gre:1, blue:0,
+    fg_tex:textureIndex('hal-9000'), bg_tex:textureIndex('flat_square'),
+    tr:dectr
+  };
+  yield {
+    x:-0.5, y:-0.5, z:0.0, r:0.5,
+    red:0, gre:0, blu:0,
+    fg_tex:textureIndex('mr_squiggle'), bg_tex:textureIndex('flat_circle'),
+    bl:decbl
+  };
+  yield {
+    x:0.5, y:-0.5, z:0.0, r:0.5,
+    red:1, gre:1, blu:0,
+    fg_tex:textureIndex('tardis'), bg_tex:textureIndex('round_square'),
+    br:decbr
+  };
 
   if (n>0) {
     // ...and the sphere.
@@ -32,6 +60,7 @@ function* sphereBuilder(n) {
     const rnd = 1.0; // Use Math.random() * n to add some randomness.
     const offset = 2.0 / n;
     const increment = Math.PI * (3.0 - Math.sqrt(5));
+    const nodeRadius = (ix) => (ix>3 && (ix%19==0)) ? 1.5 : 0.5;
 
     // Make the radius dependent on the number of vertices, with a lower limit.
     //
@@ -44,29 +73,74 @@ function* sphereBuilder(n) {
       const x = Math.cos(phi) * r;
       const z = Math.sin(phi) * r;
 
-      yield {x:x*radius, y:y*radius, z:z*radius};
+      const red = Math.random();
+      const gre = Math.random();
+      const blu = Math.random();
+
+      // Node foreground icons.
+      //
+      const fg_name = FG_ICONS[position%FG_ICONS.length];
+      const fg_tex = textureIndex(fg_name);
+
+      // Node background icons.
+      //
+      const bg_name = BG_ICONS[position%BG_ICONS.length];
+      const bg_tex = textureIndex(bg_name);
+
+      const corner = position%4;
+
+      yield {
+        x:x*radius, y:y*radius, z:z*radius, r:nodeRadius(position),
+        red:red, gre:gre, blu:blu,
+        fg_tex:fg_tex, bg_tex:bg_tex,
+        tl:corner>=0 ? dectl : 65535,
+        tr:corner>=1 ? dectr : 65535,
+        bl:corner>=2 ? decbl : 65535,
+        br:corner>=3 ? decbr : 65535
+      };
     }
   }
 }
 
+// /**
+//  * Find the radius of a scene represented by an array of x,y,z coordinates.
+//  * In other words, find the largest absolute value in the array.
+//  *
+//  * @param {*} coords An array of x,y,z coordinates.
+//  */
+// function coordsRadius(coords) {
+// //   const sceneRadius = Math.max(Math.abs(Math.max(...pos)), Math.abs(Math.min(...pos)));
+//   if (coords.length==0) {
+//     return 0;
+//   }
+
+//   let m = coords[0];
+//   for (const c of coords) {
+//     m = Math.max(m, Math.abs(c));
+//   }
+
+//   return m;
+// }
+
 /**
- * Find the radius of a scene represented by an array of x,y,z coordinates.
- * In other words, find the largest absolute value in the array.
+ * Find the radius of a scene represented by an array of objects with x,y,z coordinates.
+ * In other words, find the largest absolute value of the coordinates.
  *
  * @param {*} coords An array of x,y,z coordinates.
  */
-function coordsRadius(coords) {
-//   const sceneRadius = Math.max(Math.abs(Math.max(...pos)), Math.abs(Math.min(...pos)));
-  if (coords.length==0) {
+ function coordsRadius(nodes) {
+  if (nodes.length==0) {
     return 0;
   }
 
-  let m = coords[0];
-  for (const c of coords) {
-    m = Math.max(m, Math.abs(c));
+  let m = 0;
+  for (const node of nodes) {
+    console.log('NODE', node);
+    // m = Math.max(m, Math.abs(node.x), Math.abs(node.y), Math.abs(node.z));
+    m = Math.max(m, node.x*node.x + node.y*node.y + node.z*node.z)
   }
 
-  return m;
+  return Math.sqrt(m);
 }
 
 /**

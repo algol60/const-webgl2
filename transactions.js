@@ -1,9 +1,9 @@
 import * as twgl from './resources/4.x/twgl-full.module.js';
 
-const lineVertices = [
-  // 0,1,0, 1,1,0, 0,0,0, 1,1,0, 0,0,0, 1,0,0
-  -0.5,0.5,0, 0.5,0.5,0, -0.5,-0.5,0, 0.5,0.5,0, -0.5,-0.5,0, 0.5,-0.5,0
-];
+// const lineVertices = [
+//   // 0,1,0, 1,1,0, 0,0,0, 1,1,0, 0,0,0, 1,0,0
+//   -0.5,0.5,0, 0.5,0.5,0, -0.5,-0.5,0, 0.5,0.5,0, -0.5,-0.5,0, 0.5,-0.5,0
+// ];
 
 const vs = `#version 300 es
 // precision highp float;
@@ -26,7 +26,9 @@ void main() {
   //
   vec3 vx = position * (gl_InstanceID%2==0?1.0:-1.0);
 
-  vec4 mposition = u_model * vec4(xyz[gl_VertexID]+vx, 1);
+  vec3 this_xyz = xyz[gl_VertexID];
+
+  vec4 mposition = u_model * vec4(this_xyz+vx, 1);
 
   // // billboarding
   // vec3 cameraRight = vec3(u_view[0].x, u_view[1].x, u_view[2].x);
@@ -70,7 +72,7 @@ class Transactions {
     const lineEnds = [];
     const color = [];
     this.nInstances = lineIxs.length;
-    for(let ix=0; ix<this.nInstances; ix+=2) {
+    for (let ix=0; ix<this.nInstances; ix+=2) {
       const ni = nodes[lineIxs[ix]];
       const nj = nodes[lineIxs[ix+1]];
       lineEnds.push(
@@ -94,22 +96,22 @@ class Transactions {
        0.0,  0.125, 0
     ]
 
-    this.arrays = {
+    const arrays = {
       position: {numComponents:3, data:pos},
       xyz:      {numComponents:9, data:lineEnds, divisor:1},
       hue:      {numComponents:3, data:color, divisor:2}
     };
-    console.log('tx arrays', this.arrays);
+    console.log('tx arrays', arrays);
 
-    this.program = twgl.createProgramFromSources(gl, [vs, fs]);
-    this.programInfo = twgl.createProgramInfoFromProgram(gl, this.program);
-    this.bufferInfo = twgl.createBufferInfoFromArrays(gl, this.arrays);
+    const program = twgl.createProgramFromSources(gl, [vs, fs]);
+    this.programInfo = twgl.createProgramInfoFromProgram(gl, program);
+    this.bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
 
     this.vertexArrayInfo = twgl.createVertexArrayInfo(gl, this.programInfo, this.bufferInfo);
   }
 
   render(time, gl, viewMatrix, modelMatrix, worldViewProjectionMatrix) {
-    console.log(`draw txs at time ${time}`)
+    console.log(`draw txs at time ${time}`);
     const uniforms = {
       u_view:                 viewMatrix,
       u_model:                modelMatrix,
