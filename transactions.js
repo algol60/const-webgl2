@@ -101,7 +101,6 @@ class Transactions {
       xyz:      {numComponents:9, data:lineEnds, divisor:1},
       hue:      {numComponents:3, data:color, divisor:2}
     };
-    console.log('tx arrays', arrays);
 
     const program = twgl.createProgramFromSources(gl, [vs, fs]);
     this.programInfo = twgl.createProgramInfoFromProgram(gl, program);
@@ -111,7 +110,6 @@ class Transactions {
   }
 
   render(time, gl, viewMatrix, modelMatrix, worldViewProjectionMatrix) {
-    console.log(`draw txs at time ${time}`);
     const uniforms = {
       u_view:                 viewMatrix,
       u_model:                modelMatrix,

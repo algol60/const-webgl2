@@ -223,7 +223,6 @@ class Nodes {
   }
 
   render(time, gl, viewMatrix, modelMatrix, worldViewProjectionMatrix) {
-    console.log(`draw vxs at time ${time}`);
     const uniforms = {
       u_view:                 viewMatrix,
       u_model:                modelMatrix,

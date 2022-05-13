@@ -25,7 +25,7 @@ function* sphereBuilder(n) {
   const decbr = textureIndex('russia');
 
   n = Math.max(4, n) - 4;
-  console.log(`Sphere nodes: ${n}`);
+  // console.log(`Sphere nodes: ${n}`);
 
   // Four nodes in the middle...
   //
@@ -135,7 +135,6 @@ function* sphereBuilder(n) {
 
   let m = 0;
   for (const node of nodes) {
-    console.log('NODE', node);
     // m = Math.max(m, Math.abs(node.x), Math.abs(node.y), Math.abs(node.z));
     m = Math.max(m, node.x*node.x + node.y*node.y + node.z*node.z)
   }

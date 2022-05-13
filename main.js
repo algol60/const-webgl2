@@ -104,7 +104,7 @@ function main() {
 
   // Draw the scene.
   function drawScene(time) {
-    console.log(`draw nodes at time ${time}`)
+    console.log(`draw at time ${time}`)
     const time_d = time * 0.001;
 
     twgl.resizeCanvasToDisplaySize(gl.canvas);
