@@ -1,18 +1,14 @@
 import * as twgl from './resources/4.x/twgl-full.module.js';
 
-// const lineVertices = [
-//   // 0,1,0, 1,1,0, 0,0,0, 1,1,0, 0,0,0, 1,0,0
-//   -0.5,0.5,0, 0.5,0.5,0, -0.5,-0.5,0, 0.5,0.5,0, -0.5,-0.5,0, 0.5,-0.5,0
-// ];
-
 const vs = `#version 300 es
 // precision highp float;
 uniform mat4 u_worldViewProjection;
 uniform mat4 u_view;
 uniform mat4 u_model;
 
-in vec3 position;
-in mat3 xyz;
+in vec3 position; // Triangle vertex.
+in vec3 xyz0; // The start vertex.
+in vec3 xyz1; // The end vertex.
 in vec3 color;
 
 out vec3 f_color;
@@ -20,13 +16,16 @@ out vec3 f_color;
 void main() {
   // We're using instancing to draw transactions.
   // position contains the same vertices, repeated.
-  // vx contains the actual vertices of the transcation trinagles.
-  // To draw symmetric trinagles to make a rectangle, we need to invert
-  // the position on every second triangle.
+  // vx contains the actual vertices of the transaction triangles.
   //
-  vec3 vx = position * (gl_InstanceID%2==0?1.0:-1.0);
+  vec3 vx = position;
 
-  vec3 this_xyz = xyz[gl_VertexID];
+  // A line is built from two triangles; two vertices from one end,
+  // and a vertex from the other.
+  // We're passing in six position vertices, so we want to use vertices
+  // 0,1,5 for the first triangle, and 2,3,4 for the second triangle.
+  //
+  vec3 this_xyz = gl_VertexID>=2 && gl_VertexID<5 ? xyz1 : xyz0;
 
   vec4 mposition = u_model * vec4(this_xyz+vx, 1);
 
@@ -40,8 +39,6 @@ void main() {
 
   gl_Position = u_worldViewProjection * mposition;
   f_color = color;
-  // f_color = gl_InstanceID%2==0 ? vec3(1,1,0) : vec3(0,0,1);
-  // f_color = vec3(float(gl_InstanceID+1)/4.0, float(gl_InstanceID+1)/4.0, float(gl_InstanceID+1)/4.0);
 }
 `;
 
@@ -53,7 +50,6 @@ in vec3 f_color;
 out vec4 outColor;
 
 void main() {
-  // outColor = vec4(1.0, 0.0, 0.0, 1.0);
   outColor = vec4(f_color, 0.75);
 }
 `;
@@ -72,36 +68,40 @@ class Transactions {
   build(gl, nodes, lineIxs) {
     this.n = lineIxs.length;
 
-    const lineEnds = [];
+    const xyz2 = [];//new Float32Array(this.n*2*3);
     const color = [];
     for (let ix=0; ix<this.n; ix+=2) {
       const ni = nodes[lineIxs[ix]];
       const nj = nodes[lineIxs[ix+1]];
-      lineEnds.push(
-        ni.x-0.0, ni.y-0.0, ni.z,
-        ni.x+0.0, ni.y-0.0, ni.z,
-        nj.x-0.0, nj.y-0.0, nj.z,
-
-        nj.x-0.0, nj.y-0.0, nj.z,
-        nj.x+0.0, nj.y+0.0, nj.z,
-        ni.x+0.0, ni.y-0.0, ni.z
-      );
+      xyz2.push(ni.x, ni.y, ni.z);
+      xyz2.push(nj.x, nj.y, nj.z);
       const red = Math.random();
       const gre = Math.random();
       const blu = Math.random();
       color.push(red, gre, blu);
     }
 
+    // We're using instancing, so we only need a single instance of
+    // three vertices for each of two triangles that make a line.
+    //
     const pos = [
-      -0.0, -0.125, 0,
-      -0.0,  0.125, 0,
-       0.0,  0.125, 0
+      0.0, -0.125, 0,
+      0.0,  0.125, 0,
+      0.0,  0.125, 0,
+
+      0.0,  0.125, 0,
+      0.0, -0.125, 0,
+      0.0, -0.125, 0
     ]
 
+    // Pass the two ends of each line at the same time to each vertex.
+    // We need to know both ends at once to calculate distances and arrowhead sizes.
+    //
     const arrays = {
-      position: {numComponents:3, data:pos                },
-      xyz:      {numComponents:9, data:lineEnds, divisor:1},
-      color:    {numComponents:3, data:color,    divisor:2}
+      position: {numComponents:3, data:pos                                      },
+      xyz0:     {numComponents:3, data:xyz2,  divisor:2, offset:0*4, stride:2*3*4},
+      xyz1:     {numComponents:3, data:xyz2,  divisor:2, offset:3*4, stride:2*3*4},
+      color:    {numComponents:3, data:color, divisor:2}
     };
 
     const program = twgl.createProgramFromSources(gl, [vs, fs]);

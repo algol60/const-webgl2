@@ -1,5 +1,4 @@
 import * as grut from './resources/graph-util.js';
-import * as shaders from './resources/shaders.js';
 import * as twgl from './resources/4.x/twgl-full.module.js';
 import * as transactions from './transactions.js';
 import * as nodes from './nodes.js';
@@ -93,11 +92,28 @@ function main() {
   const txs = new transactions.Transactions();
   // txs.build(gl, NODES, [0,4, 1,5, 2,6, 3,7]);
   const lineIxs = [];
-  for (let i=4; i<nNodes-1; i+=Math.floor(nNodes/1000)+1) {
-    const vx0 = Math.floor(Math.random()*nNodes);
-    const vx1 = Math.floor(Math.random()*nNodes);
-    lineIxs.push(vx0, vx1);
+
+  // Connect random nodes.
+  //
+  // for (let i=4; i<nNodes-1; i+=Math.floor(nNodes/1000)+1) {
+  //   const vx0 = Math.floor(Math.random()*nNodes);
+  //   const vx1 = Math.floor(Math.random()*nNodes);
+  //   lineIxs.push(vx0, vx1);
+  // }
+
+  // Connect nodes with the same icon.
+  //
+  const iconIx = grut.textureIndex('dalek');
+  for (const [nodeIx, node] of NODES.entries()) {
+    if (node.fg_tex==iconIx) {
+      if (lineIxs.length>0) {
+        lineIxs.push(nodeIx);
+      }
+      lineIxs.push(nodeIx);
+    }
   }
+  lineIxs.pop();
+
   console.log(`nTx: ${lineIxs.length/2}`);
   // txs.build(gl, NODES, [4,5, 5,6, 6,7, 7,8, 8,9]);
   txs.build(gl, NODES, lineIxs);
@@ -109,8 +125,12 @@ function main() {
 
     twgl.resizeCanvasToDisplaySize(gl.canvas);
 
-    // Tell WebGL how to convert from clip space to pixels
+    // Tell WebGL how to convert from clip space to pixels.
+    //
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+    // const pixelDensity = gl.canvas.height * 0.5 / Math.tan(grut.FIELD_OF_VIEW);
+    // console.log(`pixelDensity=${pixelDensity}`);
 
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);

@@ -212,8 +212,8 @@ class Nodes {
       decorIndex[nodeIx*4+3] = node.hasOwnProperty('br') ? node.br : 65535;
     }
 
-    // We're using instancing, so we only need a single instance
-    // of the vertices for two triangles.
+    // We're using instancing, so we only need a single instance of
+    // three vertices for two triangles that make a node.
     //
     const pos = [
       0,1, 1,1, 0,0,
