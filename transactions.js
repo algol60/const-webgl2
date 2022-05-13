@@ -13,7 +13,7 @@ uniform mat4 u_model;
 
 in vec3 position;
 in mat3 xyz;
-in vec3 hue;
+in vec3 color;
 
 out vec3 f_color;
 
@@ -30,6 +30,8 @@ void main() {
 
   vec4 mposition = u_model * vec4(this_xyz+vx, 1);
 
+  // TODO "billboard" the lines.
+
   // // billboarding
   // vec3 cameraRight = vec3(u_view[0].x, u_view[1].x, u_view[2].x);
   // vec3 cameraUp = vec3(u_view[0].y, u_view[1].y, u_view[2].y);
@@ -37,7 +39,7 @@ void main() {
   // mposition.xyz += cameraRight * vx.x + cameraUp * vx.y;
 
   gl_Position = u_worldViewProjection * mposition;
-  f_color = hue;
+  f_color = color;
   // f_color = gl_InstanceID%2==0 ? vec3(1,1,0) : vec3(0,0,1);
   // f_color = vec3(float(gl_InstanceID+1)/4.0, float(gl_InstanceID+1)/4.0, float(gl_InstanceID+1)/4.0);
 }
@@ -68,11 +70,11 @@ class Transactions {
    * @param {*} lineIxs Indexes into nodes of pairs of line ends
    */
   build(gl, nodes, lineIxs) {
+    this.n = lineIxs.length;
 
     const lineEnds = [];
     const color = [];
-    this.nInstances = lineIxs.length;
-    for (let ix=0; ix<this.nInstances; ix+=2) {
+    for (let ix=0; ix<this.n; ix+=2) {
       const ni = nodes[lineIxs[ix]];
       const nj = nodes[lineIxs[ix+1]];
       lineEnds.push(
@@ -97,16 +99,16 @@ class Transactions {
     ]
 
     const arrays = {
-      position: {numComponents:3, data:pos},
+      position: {numComponents:3, data:pos                },
       xyz:      {numComponents:9, data:lineEnds, divisor:1},
-      hue:      {numComponents:3, data:color, divisor:2}
+      color:    {numComponents:3, data:color,    divisor:2}
     };
 
     const program = twgl.createProgramFromSources(gl, [vs, fs]);
     this.programInfo = twgl.createProgramInfoFromProgram(gl, program);
     this.bufferInfo = twgl.createBufferInfoFromArrays(gl, arrays);
 
-    this.vertexArrayInfo = twgl.createVertexArrayInfo(gl, this.programInfo, this.bufferInfo);
+    this.vao = twgl.createVertexArrayInfo(gl, this.programInfo, this.bufferInfo);
   }
 
   render(time, gl, viewMatrix, modelMatrix, worldViewProjectionMatrix) {
@@ -117,9 +119,9 @@ class Transactions {
     };
 
     gl.useProgram(this.programInfo.program);
-    twgl.setBuffersAndAttributes(gl, this.programInfo, this.vertexArrayInfo);
+    twgl.setBuffersAndAttributes(gl, this.programInfo, this.vao);
     twgl.setUniforms(this.programInfo, uniforms);
-    twgl.drawBufferInfo(gl, this.vertexArrayInfo, gl.TRIANGLES, this.vertexArrayInfo.numelements, 0, this.nInstances);
+    twgl.drawBufferInfo(gl, this.vao, gl.TRIANGLES, this.vao.numelements, 0, this.n);
   }
 }
 

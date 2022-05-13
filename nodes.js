@@ -3,35 +3,46 @@ import * as twgl from './resources/4.x/twgl-full.module.js';
 const vs = `#version 300 es
 precision highp float;
 
+// The xy corners of the two triangles that form a sqaure.
+//
+const vec2 CORNERS[] = vec2[](
+  vec2(-1,-1), vec2(1,-1), vec2(-1,1),
+               vec2(1,-1), vec2(-1,1), vec2(1,1)
+);
+
+const vec2 TEX_COORDS[] = vec2[](
+  vec2(0,1), vec2(1,1), vec2(0,0),
+             vec2(1,1), vec2(0,0), vec2(1,0)
+);
+
 uniform mat4 u_worldViewProjection;
 uniform mat4 u_view;
 uniform mat4 u_model;
 
 in vec3 position;
-in vec2 corners;
-in vec2 fgCoord;
-// in vec2 bgCoord;
+in vec3 xyz;
+in float radius;
 in vec3 color;
 in uvec2 iconsIndex;
 in uvec4 decorIndex;
 
 out vec2 v_fgCoord;
-// out vec2 v_bgCoord;
 out vec3 v_color;
 flat out uvec2 f_iconsIndex;
 flat out uvec4 f_decorIndex;
 
 void main() {
-  v_fgCoord = fgCoord;
-  // v_bgCoord = bgCoord;
+  v_fgCoord = TEX_COORDS[gl_VertexID];
   v_color = color;
 
-  vec4 mposition = u_model * vec4(position, 1);
+  vec4 mposition = u_model * vec4(xyz, 1);
   // position.xy += corners;
 
   // billboarding
   vec3 cameraRight = vec3(u_view[0].x, u_view[1].x, u_view[2].x);
   vec3 cameraUp = vec3(u_view[0].y, u_view[1].y, u_view[2].y);
+
+  vec2 corners = CORNERS[gl_VertexID] * radius;
   mposition.xyz += cameraRight * corners.x + cameraUp * corners.y;
 
   gl_Position = u_worldViewProjection * mposition;
@@ -44,11 +55,19 @@ void main() {
 const fs = `#version 300 es
 precision highp float;
 
+// This says "no icon here".
+//
 const uint NO_ICON = 65535u;
+
+// The texture atlas contains 8x8 images, each image is 256x256.
+// Same as Constellation, except it uses a 2D texture.
+// (Obviously we need a 3D texture, but this is a proof-of-concept. :-))
+// We use these constants to calculate leftx, topy, rightx, bottomy for texcoords.
+//
+const float TEXTURE_SIZE = 0.125;
 const float HALF_PIXEL = (0.5 / (256.0 * 8.0));
 
 in vec2 v_fgCoord;
-// in vec2 v_bgCoord;
 in vec3 v_color;
 flat in uvec2 f_iconsIndex;
 flat in uvec4 f_decorIndex;
@@ -66,14 +85,20 @@ vec2 iconxy(uint ix) {
 
 void main() {
 
+  // Uncomment this to prove that nodes with radius 0.5 just touch each other.
+  //
+  // outColor = vec4(v_color, 1);
+  // return;
+
   // We don't get the texture coordinates for each icon.
-  // The texture coordinate is a (0..1, 0..1) range.
-  // Instead, we get the icon index, and figure out the icon coordinates here.
+  // Instead, we get a texture coordinate in a constant (0..1, 0..1) range
+  // from the vertex shader, and an icon index, and figure out
+  // the icon coordinates here.
   // This saves bytes for each icon.
   //
   vec2 fgxy = iconxy(f_iconsIndex[0]);
   vec2 bgxy = iconxy(f_iconsIndex[1]);
-  const vec2 size = vec2(0.125, 0.125);
+  const vec2 size = vec2(TEXTURE_SIZE, TEXTURE_SIZE);
 
   // Start with the foreground icon.
   // Only use the background icon when the foreground is transparent.
@@ -150,22 +175,17 @@ class Nodes {
    * @param {*} lineIxs Indexes into nodes of pairs of line ends
    */
    build(gl, nodes) {
-    const nNodes = nodes.length;
+    this.n = nodes.length;
 
-    const pos = []; // node centre positions
-    const cor = []; // node corners
-    const fgTex = []; // Foreground icon texture coordinates
-    // const bgTex = []; // Background icon texture coordinates
+    const xyz = []; // node centre positions
+    const radius = []; // node radii
     const color = []; // node color
 
-  const iconsIndex = new Uint16Array(nNodes*6 * 2); // foreground + background icons
-  const decorIndex = new Uint16Array(nNodes*6 * 4); // Four decorators per node.
+    const iconsIndex = new Uint16Array(this.n*2); // fg + bg icons
+    const decorIndex = new Uint16Array(this.n*4); // Four decorators per node.
 
-    let nodeIx = 0;
-    for (const node of nodes) {
-      const r = node.r;
-      cor.push(-r,-r, r,-r, -r,r,
-                      r,-r, -r,r, r,r);
+    for (const [nodeIx, node] of nodes.entries()) {
+      radius.push(node.r);
 
       // The texture atlas contains 8x8 images, each image is 256x256.
       // Same as Constellation, except it uses a 2D texture.
@@ -174,45 +194,39 @@ class Nodes {
       const TEXTURE_SIZE = 0.125;
       const HALF_PIXEL = (0.5 / (256 * 8));
 
-      const push_tex_coords = (buf) => {
-        buf.push(0,1, 1,1, 0,0,
-                      1,1, 0,0, 1,0);
-      };
-
       // Node foreground icons.
       //
       const fg_tex = node.fg_tex;
-      push_tex_coords(fgTex);
 
       // Node background icons.
       //
       const bg_tex = node.bg_tex;
 
-      // Push a central vertex for each triangle.
-      // The vertex shader will set the position for each corner.
-      //
-      for (let vx=0; vx<6; vx++) {
-        pos.push(node.x, node.y, node.z);
-        color.push(node.red, node.gre, node.blu);
-        iconsIndex[nodeIx*6*2+vx*2+0] = fg_tex;
-        iconsIndex[nodeIx*6*2+vx*2+1] = bg_tex;
-
-        decorIndex[nodeIx*6*4+vx*4+0] = node.hasOwnProperty('tl') ? node.tl : 65535;
-        decorIndex[nodeIx*6*4+vx*4+1] = node.hasOwnProperty('tr') ? node.tr : 65535;
-        decorIndex[nodeIx*6*4+vx*4+2] = node.hasOwnProperty('bl') ? node.bl : 65535;
-        decorIndex[nodeIx*6*4+vx*4+3] = node.hasOwnProperty('br') ? node.br : 65535;
-      }
-
-      nodeIx++;
+      xyz.push(node.x, node.y, node.z);
+      color.push(node.red, node.gre, node.blu)
+      iconsIndex[nodeIx*2+0] = fg_tex;
+      iconsIndex[nodeIx*2+1] = bg_tex;
+      decorIndex[nodeIx*4+0] = node.hasOwnProperty('tl') ? node.tl : 65535;
+      decorIndex[nodeIx*4+1] = node.hasOwnProperty('tr') ? node.tr : 65535;
+      decorIndex[nodeIx*4+2] = node.hasOwnProperty('bl') ? node.bl : 65535;
+      decorIndex[nodeIx*4+3] = node.hasOwnProperty('br') ? node.br : 65535;
     }
 
+    // We're using instancing, so we only need a single instance
+    // of the vertices for two triangles.
+    //
+    const pos = [
+      0,1, 1,1, 0,0,
+           1,1, 0,0, 1,0
+    ];
+
     const arrays = {
-      position: {numComponents:3, data:pos},
-      corners:  {numComponents:2, data:cor},
-      fgCoord:  {numComponents:2, data:fgTex},
-      color:    {numComponents:3, data:color},
-      iconsIndex: {numComponents:2, data:iconsIndex},
-      decorIndex: {numComponents:4, data:decorIndex}
+      position:   {numComponents:2, data:pos                  },
+      xyz:        {numComponents:3, data:xyz,        divisor:1},
+      radius:     {numComponents:1, data:radius,     divisor:1},
+      color:      {numComponents:3, data:color,      divisor:1},
+      iconsIndex: {numComponents:2, data:iconsIndex, divisor:1},
+      decorIndex: {numComponents:4, data:decorIndex, divisor:1}
     };
 
     const program = twgl.createProgramFromSources(gl, [vs, fs]);
@@ -233,7 +247,8 @@ class Nodes {
     twgl.setBuffersAndAttributes(gl, this.programInfo, this.vao);
     twgl.setUniforms(this.programInfo, uniforms);
 
-    gl.drawArrays(gl.TRIANGLES, 0, this.bufferInfo.numElements);
+    // gl.drawArrays(gl.TRIANGLES, 0, this.bufferInfo.numElements);
+    twgl.drawBufferInfo(gl, this.vao, gl.TRIANGLES, this.vao.numelements, 0, this.n);
   }
 }
 
