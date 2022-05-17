@@ -12,15 +12,9 @@ function main() {
   const nNodes = 100;
   console.log(`nNodes: ${nNodes}`);
 
-  const iconsIndex = new Uint16Array(nNodes*6 * 2); // foreground + background icons
-  const decorIndex = new Uint16Array(nNodes*6 * 4); // Four decorators per node.
+  const graph = grut.sphereBuilder(nNodes);
 
-  const NODES = [];
-  for (const node of grut.sphereBuilder(nNodes)) {
-    NODES.push(node);
-  }
-
-  const sceneRadius = grut.coordsRadius(NODES);
+  const sceneRadius = grut.coordsRadius(graph.vxs);
   console.log(`Scene radius: ${sceneRadius}`);
 
   // Get A WebGL2 context.
@@ -85,38 +79,12 @@ function main() {
   // Nodes.
   //
   const vxs = new nodes.Nodes();
-  vxs.build(gl, NODES);
+  vxs.build(gl, graph);
 
   // Transactions.
   //
   const txs = new transactions.Transactions();
-  // txs.build(gl, NODES, [0,4, 1,5, 2,6, 3,7]);
-  const lineIxs = [];
-
-  // Connect random nodes.
-  //
-  // for (let i=4; i<nNodes-1; i+=Math.floor(nNodes/1000)+1) {
-  //   const vx0 = Math.floor(Math.random()*nNodes);
-  //   const vx1 = Math.floor(Math.random()*nNodes);
-  //   lineIxs.push(vx0, vx1);
-  // }
-
-  // Connect nodes with the same icon.
-  //
-  const iconIx = grut.textureIndex('dalek');
-  for (const [nodeIx, node] of NODES.entries()) {
-    if (node.fg_tex==iconIx) {
-      if (lineIxs.length>0) {
-        lineIxs.push(nodeIx);
-      }
-      lineIxs.push(nodeIx);
-    }
-  }
-  lineIxs.pop();
-
-  console.log(`nTx: ${lineIxs.length/2}`);
-  // txs.build(gl, NODES, [4,5, 5,6, 6,7, 7,8, 8,9]);
-  txs.build(gl, NODES, lineIxs);
+  txs.build(gl, graph);
 
   // Draw the scene.
   function drawScene(time) {

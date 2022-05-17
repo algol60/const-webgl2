@@ -174,8 +174,9 @@ class Nodes {
    * @param {*} nodes
    * @param {*} lineIxs Indexes into nodes of pairs of line ends
    */
-   build(gl, nodes) {
-    this.n = nodes.length;
+   build(gl, graph) {
+    const vxs = graph.vxs;
+    this.n = vxs.length;
 
     const xyz = []; // node centre positions
     const radius = []; // node radii
@@ -184,7 +185,7 @@ class Nodes {
     const iconsIndex = new Uint16Array(this.n*2); // fg + bg icons
     const decorIndex = new Uint16Array(this.n*4); // Four decorators per node.
 
-    for (const [nodeIx, node] of nodes.entries()) {
+    for (const [nodeIx, node] of vxs.entries()) {
       radius.push(node.r);
 
       // The texture atlas contains 8x8 images, each image is 256x256.
@@ -246,8 +247,6 @@ class Nodes {
     gl.useProgram(this.programInfo.program);
     twgl.setBuffersAndAttributes(gl, this.programInfo, this.vao);
     twgl.setUniforms(this.programInfo, uniforms);
-
-    // gl.drawArrays(gl.TRIANGLES, 0, this.bufferInfo.numElements);
     twgl.drawBufferInfo(gl, this.vao, gl.TRIANGLES, this.vao.numelements, 0, this.n);
   }
 }

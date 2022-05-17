@@ -65,20 +65,19 @@ class Transactions {
    * @param {*} nodes
    * @param {*} lineIxs Indexes into nodes of pairs of line ends
    */
-  build(gl, nodes, lineIxs) {
-    this.n = lineIxs.length;
+  build(gl, graph) {//nodes, lineIxs) {
+    const vxs = graph.vxs;
+    const txs = graph.txs;
+    this.n = txs.length;
 
     const xyz2 = [];//new Float32Array(this.n*2*3);
     const color = [];
-    for (let ix=0; ix<this.n; ix+=2) {
-      const ni = nodes[lineIxs[ix]];
-      const nj = nodes[lineIxs[ix+1]];
+    for (const tx of txs) {
+      const ni = vxs[tx.vx0];
+      const nj = vxs[tx.vx1];
       xyz2.push(ni.x, ni.y, ni.z);
       xyz2.push(nj.x, nj.y, nj.z);
-      const red = Math.random();
-      const gre = Math.random();
-      const blu = Math.random();
-      color.push(red, gre, blu);
+      color.push(tx.red, tx.gre, tx.blu);
     }
 
     // We're using instancing, so we only need a single instance of
@@ -98,10 +97,10 @@ class Transactions {
     // We need to know both ends at once to calculate distances and arrowhead sizes.
     //
     const arrays = {
-      position: {numComponents:3, data:pos                                      },
-      xyz0:     {numComponents:3, data:xyz2,  divisor:2, offset:0*4, stride:2*3*4},
-      xyz1:     {numComponents:3, data:xyz2,  divisor:2, offset:3*4, stride:2*3*4},
-      color:    {numComponents:3, data:color, divisor:2}
+      position: {numComponents:3, data:pos                                       },
+      xyz0:     {numComponents:3, data:xyz2,  divisor:1, offset:0*4, stride:2*3*4},
+      xyz1:     {numComponents:3, data:xyz2,  divisor:1, offset:3*4, stride:2*3*4},
+      color:    {numComponents:3, data:color, divisor:1}
     };
 
     const program = twgl.createProgramFromSources(gl, [vs, fs]);

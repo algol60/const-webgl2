@@ -15,7 +15,7 @@ const MINIMUM_CAMERA_DISTANCE = 6;
  * Generate the coordinates of a sphere.
  * Put four nodes in a square in the middle.
  */
-function* sphereBuilder(n) {
+function sphereBuilder(n) {
   const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
   const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
   // const DEC_ICONS = ['true', 'false', 'australia', 'china', 'russia', 'ukraine']
@@ -27,32 +27,34 @@ function* sphereBuilder(n) {
   n = Math.max(4, n) - 4;
   // console.log(`Sphere nodes: ${n}`);
 
+  const vxs = [];
+
   // Four nodes in the middle...
   //
-  yield {
+  vxs.push({
     x:-0.5, y:0.5, z:0.0, r:0.5,
     red:1, gre:0, blu:0,
     fg_tex:textureIndex('dalek'), bg_tex:textureIndex('round_circle'),
     tl:dectl
-  };
-  yield {
+  });
+  vxs.push({
     x:0.5, y:0.5, z:0.0, r:0.5,
     red:0, gre:1, blue:0,
     fg_tex:textureIndex('hal-9000'), bg_tex:textureIndex('flat_square'),
     tr:dectr
-  };
-  yield {
+  });
+  vxs.push({
     x:-0.5, y:-0.5, z:0.0, r:0.5,
     red:0, gre:0, blu:0,
     fg_tex:textureIndex('mr_squiggle'), bg_tex:textureIndex('flat_circle'),
     bl:decbl
-  };
-  yield {
+  });
+  vxs.push({
     x:0.5, y:-0.5, z:0.0, r:0.5,
     red:1, gre:1, blu:0,
     fg_tex:textureIndex('tardis'), bg_tex:textureIndex('round_square'),
     br:decbr
-  };
+  });
 
   if (n>0) {
     // ...and the sphere.
@@ -89,7 +91,7 @@ function* sphereBuilder(n) {
 
       const corner = position%4;
 
-      yield {
+      vxs.push({
         x:x*radius, y:y*radius, z:z*radius, r:nodeRadius(position),
         red:red, gre:gre, blu:blu,
         fg_tex:fg_tex, bg_tex:bg_tex,
@@ -97,9 +99,41 @@ function* sphereBuilder(n) {
         tr:corner>=1 ? dectr : 65535,
         bl:corner>=2 ? decbl : 65535,
         br:corner>=3 ? decbr : 65535
-      };
+      });
     }
   }
+
+  const txs = [];
+  // Connect random nodes.
+  //
+  // for (let i=4; i<nNodes-1; i+=Math.floor(nNodes/1000)+1) {
+  //   const vx0 = Math.floor(Math.random()*nNodes);
+  //   const vx1 = Math.floor(Math.random()*nNodes);
+  //   lineIxs.push(vx0, vx1);
+  // }
+
+  // Connect nodes with the same icon.
+  //
+  const iconIx = textureIndex('dalek');
+  let prevIx = -1;
+  for (const [nodeIx, node] of vxs.entries()) {
+    if (node.fg_tex==iconIx) {
+      if (prevIx!=-1) {
+        txs.push({
+          vx0: prevIx,
+          vx1: nodeIx,
+          red: Math.random(),
+          gre: Math.random(),
+          blu: Math.random()
+        });
+      }
+      prevIx = nodeIx;
+    }
+  }
+
+  console.log(`nTx: ${txs.length}`);
+
+  return {vxs:vxs, txs:txs};
 }
 
 // /**
