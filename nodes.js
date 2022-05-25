@@ -64,6 +64,9 @@ const uint NO_ICON = 65535u;
 // (Obviously we need a 3D texture, but this is a proof-of-concept. :-))
 // We use these constants to calculate leftx, topy, rightx, bottomy for texcoords.
 //
+// The HALF_PIXEL offset into the texture should give us an offset into
+// the centre of a pixel, to avoid bleeding into adjacent icons at the edges.
+//
 const float TEXTURE_SIZE = 0.125;
 const float HALF_PIXEL = (0.5 / (256.0 * 8.0));
 
@@ -76,11 +79,11 @@ uniform sampler2D u_diffuse;
 
 out vec4 outColor;
 
-// The icons are in a n 8x8 texture.
+// The icons are in an 8x8 texture.
 // Given an icon index, return the position of the icon in the texture.
 //
 vec2 iconxy(uint ix) {
-  return vec2(float(ix % 8u), float(ix / 8u)) / 8.0 + vec2(HALF_PIXEL, -2.0*HALF_PIXEL);
+  return vec2(float(ix % 8u), float(ix / 8u)) / 8.0 + vec2(HALF_PIXEL);
 }
 
 void main() {
@@ -98,7 +101,7 @@ void main() {
   //
   vec2 fgxy = iconxy(f_iconsIndex[0]);
   vec2 bgxy = iconxy(f_iconsIndex[1]);
-  const vec2 size = vec2(TEXTURE_SIZE, TEXTURE_SIZE);
+  const vec2 size = vec2(TEXTURE_SIZE, TEXTURE_SIZE) - 2.0*vec2(HALF_PIXEL);
 
   // Start with the foreground icon.
   // Only use the background icon when the foreground is transparent.
@@ -117,7 +120,9 @@ void main() {
   // Now do the decorators.
   //
 
-  // Testing: overlay the same icon; actually, get it from another index.
+  // A decorator takes up 1/3 of the node size.
+  // Therefore we need to re-multiply to get the texture.
+  //
   const float decoratorRadius = 3.0;
   const float inv = 1.0 / decoratorRadius;
 
@@ -188,12 +193,12 @@ class Nodes {
     for (const [nodeIx, node] of vxs.entries()) {
       radius.push(node.r);
 
-      // The texture atlas contains 8x8 images, each image is 256x256.
-      // Same as Constellation, except it uses a 2D texture.
-      // Calculate leftx, topy, rightx, bottomy for texcoords.
-      //
-      const TEXTURE_SIZE = 0.125;
-      const HALF_PIXEL = (0.5 / (256 * 8));
+      // // The texture atlas contains 8x8 images, each image is 256x256.
+      // // Same as Constellation, except it uses a 2D texture.
+      // // Calculate leftx, topy, rightx, bottomy for texcoords.
+      // //
+      // const TEXTURE_SIZE = 0.125;
+      // const HALF_PIXEL = (0.5 / (256 * 8));
 
       // Node foreground icons.
       //
@@ -237,12 +242,13 @@ class Nodes {
     this.vao = twgl.createVertexArrayInfo(gl, this.programInfo, this.bufferInfo);
   }
 
-  render(time, gl, matrices) {
+  render(time, gl, matrices, atlas) {
     const viewProjectionMatrix = m4.multiply(matrices.projection, matrices.view);
     const uniforms = {
       u_view: matrices.view,
       u_model: matrices.model,
-      u_worldViewProjection: viewProjectionMatrix
+      u_worldViewProjection: viewProjectionMatrix,
+      u_diffuse: atlas
     };
 
     gl.useProgram(this.programInfo.program);

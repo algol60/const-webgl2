@@ -124,7 +124,7 @@ function main() {
 
     updateMatrices();
 
-    vxs.render(time, gl, matrices);
+    vxs.render(time, gl, matrices, atlas);
 
     txs.render(time, gl, matrices);
 

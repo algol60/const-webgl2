@@ -22,7 +22,7 @@ function sphereBuilder(n) {
   const dectl = textureIndex('true');
   const dectr = textureIndex('false');
   const decbl = textureIndex('ukraine');
-  const decbr = textureIndex('russia');
+  const decbr = textureIndex('china');
 
   n = Math.max(4, n) - 4;
   // console.log(`Sphere nodes: ${n}`);
@@ -89,16 +89,16 @@ function sphereBuilder(n) {
       const bg_name = BG_ICONS[position%BG_ICONS.length];
       const bg_tex = textureIndex(bg_name);
 
-      const corner = position%4;
+      const corner = position%5;
 
       vxs.push({
         x:x*sphereRadius, y:y*sphereRadius, z:z*sphereRadius, r:nodeRadius(position),
         red:red, gre:gre, blu:blu,
         fg_tex:fg_tex, bg_tex:bg_tex,
-        tl:corner>=0 ? dectl : 65535,
-        tr:corner>=1 ? dectr : 65535,
-        bl:corner>=2 ? decbl : 65535,
-        br:corner>=3 ? decbr : 65535
+        tl:corner>=1 ? dectl : 65535,
+        tr:corner>=2 ? dectr : 65535,
+        bl:corner>=3 ? decbl : 65535,
+        br:corner>=4 ? decbr : 65535
       });
     }
   }
