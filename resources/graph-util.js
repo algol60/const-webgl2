@@ -112,24 +112,43 @@ function sphereBuilder(n) {
   //   lineIxs.push(vx0, vx1);
   // }
 
+  const connect = (iconIx) => {
+    let prevIx = -1;
+    for (const [nodeIx, node] of vxs.entries()) {
+      if (node.fg_tex==iconIx) {
+        if (prevIx!=-1) {
+          txs.push({
+            vx0: prevIx,
+            vx1: nodeIx,
+            red: Math.random(),
+            gre: Math.random(),
+            blu: Math.random()
+          });
+        }
+        prevIx = nodeIx;
+      }
+    }
+  };
   // Connect nodes with the same icon.
   //
   const iconIx = textureIndex('dalek');
-  let prevIx = -1;
-  for (const [nodeIx, node] of vxs.entries()) {
-    if (node.fg_tex==iconIx) {
-      if (prevIx!=-1) {
-        txs.push({
-          vx0: prevIx,
-          vx1: nodeIx,
-          red: Math.random(),
-          gre: Math.random(),
-          blu: Math.random()
-        });
-      }
-      prevIx = nodeIx;
-    }
-  }
+  connect(iconIx);
+  connect(textureIndex('hal-9000'));
+  // let prevIx = -1;
+  // for (const [nodeIx, node] of vxs.entries()) {
+  //   if (node.fg_tex==iconIx) {
+  //     if (prevIx!=-1) {
+  //       txs.push({
+  //         vx0: prevIx,
+  //         vx1: nodeIx,
+  //         red: Math.random(),
+  //         gre: Math.random(),
+  //         blu: Math.random()
+  //       });
+  //     }
+  //     prevIx = nodeIx;
+  //   }
+  // }
 
   console.log(`nTx: ${txs.length}`);
 
