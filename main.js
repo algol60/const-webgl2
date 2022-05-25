@@ -32,13 +32,6 @@ function main() {
   //
   const atlas = textureUtils.loadTexture(gl, 'icons/_atlas.png', () => requestAnimationFrame(drawScene));
 
-  const shaderUniforms = {
-    u_worldViewProjection: m4.identity(),
-    u_view:           m4.identity(),
-    u_model: m4.identity(),
-    u_diffuse: atlas
-  };
-
   // Set up to compute the camera's matrix using lookAt.
   //
   const camDist = grut.cameraDistance(gl.canvas, sceneRadius);
@@ -60,20 +53,29 @@ function main() {
 
   let cameraMatrix;
   let viewProjectionMatrix;
-  function updateViewProjectionMatrix(copyViewMatrix) {
-    // Compute the projection matrix
+
+  const matrices = {};
+
+  /**
+   * Compute the various matrices.
+   * @param {*} copyViewMatrix
+   */
+  function updateMatrices() {
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 
     let modelMatrix = m4.identity();
     modelMatrix = m4.xRotate(modelMatrix, scene.yRot);
     modelMatrix = m4.yRotate(modelMatrix, scene.xRot);
-    shaderUniforms.u_model = modelMatrix;
 
     const projectionMatrix =
       m4.perspective(grut.FIELD_OF_VIEW, aspect, grut.CAMERA_NEAR, grut.CAMERA_FAR);
     // Make a view matrix from the camera matrix.
-    let viewMatrix = m4.inverse(cameraMatrix, copyViewMatrix);
+    let viewMatrix = m4.inverse(cameraMatrix);
     viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+
+    matrices.model = modelMatrix;
+    matrices.view = viewMatrix;
+    matrices.projection = projectionMatrix;
   }
 
   // Nodes.
@@ -120,22 +122,11 @@ function main() {
 
     cameraMatrix = m4.lookAt(camera.eye, camera.target, camera.up)
 
-    // // Make a view matrix from the camera matrix.
-    // const viewMatrix = m4.inverse(cameraMatrix);//, shaderUniforms.u_view);
-    // shaderUniforms.u_view = viewMatrix;
-    // const viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
-    updateViewProjectionMatrix(shaderUniforms.u_view);
+    updateMatrices();
 
-    const worldMatrix = m4.identity();
-    m4.multiply(viewProjectionMatrix, worldMatrix, shaderUniforms.u_worldViewProjection);
+    vxs.render(time, gl, matrices);
 
-    // // Draw the geometry.
-    // // gl.drawElements(gl.TRIANGLES, bufferInfo.numElements, gl.UNSIGNED_SHORT, 0);
-    // gl.drawArrays(gl.TRIANGLES, 0, bufferInfo.numElements);
-
-    vxs.render(time, gl, shaderUniforms.u_view, shaderUniforms.u_model, shaderUniforms.u_worldViewProjection);
-
-    txs.render(time, gl, shaderUniforms.u_view, shaderUniforms.u_model, shaderUniforms.u_worldViewProjection);
+    txs.render(time, gl, matrices);
 
     if (spin) {
       requestAnimationFrame(drawScene);

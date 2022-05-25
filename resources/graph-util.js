@@ -32,25 +32,25 @@ function sphereBuilder(n) {
   // Four nodes in the middle...
   //
   vxs.push({
-    x:-0.5, y:0.5, z:0.0, r:0.5,
+    x:-1, y:1, z:0.0, r:1,
     red:1, gre:0, blu:0,
     fg_tex:textureIndex('dalek'), bg_tex:textureIndex('round_circle'),
     tl:dectl
   });
   vxs.push({
-    x:0.5, y:0.5, z:0.0, r:0.5,
+    x:1, y:1, z:0.0, r:1,
     red:0, gre:1, blue:0,
     fg_tex:textureIndex('hal-9000'), bg_tex:textureIndex('flat_square'),
     tr:dectr
   });
   vxs.push({
-    x:-0.5, y:-0.5, z:0.0, r:0.5,
+    x:-1, y:-1, z:0.0, r:1,
     red:0, gre:0, blu:0,
     fg_tex:textureIndex('mr_squiggle'), bg_tex:textureIndex('flat_circle'),
     bl:decbl
   });
   vxs.push({
-    x:0.5, y:-0.5, z:0.0, r:0.5,
+    x:1, y:-1, z:0.0, r:1,
     red:1, gre:1, blu:0,
     fg_tex:textureIndex('tardis'), bg_tex:textureIndex('round_square'),
     br:decbr
@@ -62,11 +62,11 @@ function sphereBuilder(n) {
     const rnd = 1.0; // Use Math.random() * n to add some randomness.
     const offset = 2.0 / n;
     const increment = Math.PI * (3.0 - Math.sqrt(5));
-    const nodeRadius = (ix) => (ix>3 && (ix%19==0)) ? 1.5 : 0.5;
+    const nodeRadius = (ix) => 1;//(ix>3 && (ix%2==0)) ? 2 : 1;
 
     // Make the radius dependent on the number of vertices, with a lower limit.
     //
-    const radius = 8 + Math.sqrt(n);
+    const sphereRadius = 8 + Math.sqrt(n);
 
     for (let position=0; position<n; position++) {
       const y = ((position * offset) - 1) + (offset / 2);
@@ -92,7 +92,7 @@ function sphereBuilder(n) {
       const corner = position%4;
 
       vxs.push({
-        x:x*radius, y:y*radius, z:z*radius, r:nodeRadius(position),
+        x:x*sphereRadius, y:y*sphereRadius, z:z*sphereRadius, r:nodeRadius(position),
         red:red, gre:gre, blu:blu,
         fg_tex:fg_tex, bg_tex:bg_tex,
         tl:corner>=0 ? dectl : 65535,
@@ -112,19 +112,23 @@ function sphereBuilder(n) {
   //   lineIxs.push(vx0, vx1);
   // }
 
-  const connect = (iconIx) => {
+  const connect = (iconIx, colorFun) => {
     let prevIx = -1;
+    const len = vxs.filter(vx => vx.fg_tex==iconIx).length - 1;
+    let i = 0;
     for (const [nodeIx, node] of vxs.entries()) {
       if (node.fg_tex==iconIx) {
         if (prevIx!=-1) {
+          const c = colorFun(i, len);
           txs.push({
             vx0: prevIx,
             vx1: nodeIx,
-            red: Math.random(),
-            gre: Math.random(),
-            blu: Math.random()
+            red: c.red,
+            gre: c.gre,
+            blu: c.blu
           });
         }
+        i++;
         prevIx = nodeIx;
       }
     }
@@ -132,23 +136,8 @@ function sphereBuilder(n) {
   // Connect nodes with the same icon.
   //
   const iconIx = textureIndex('dalek');
-  connect(iconIx);
-  connect(textureIndex('hal-9000'));
-  // let prevIx = -1;
-  // for (const [nodeIx, node] of vxs.entries()) {
-  //   if (node.fg_tex==iconIx) {
-  //     if (prevIx!=-1) {
-  //       txs.push({
-  //         vx0: prevIx,
-  //         vx1: nodeIx,
-  //         red: Math.random(),
-  //         gre: Math.random(),
-  //         blu: Math.random()
-  //       });
-  //     }
-  //     prevIx = nodeIx;
-  //   }
-  // }
+  connect(textureIndex('dalek'), (i, n) => ({red:1-i/n, gre:1-i/n, blu:i/n}));
+  connect(textureIndex('hal-9000'), (i,n) =>({red:1, gre:i/n, blu:i/n}));
 
   console.log(`nTx: ${txs.length}`);
 

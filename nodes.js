@@ -217,8 +217,8 @@ class Nodes {
     // three vertices for two triangles that make a node.
     //
     const pos = [
-      0,1, 1,1, 0,0,
-           1,1, 0,0, 1,0
+      -1,1, 1,1, -1,-1,
+            1,1, -1,-1, 1,-1
     ];
 
     const arrays = {
@@ -237,11 +237,12 @@ class Nodes {
     this.vao = twgl.createVertexArrayInfo(gl, this.programInfo, this.bufferInfo);
   }
 
-  render(time, gl, viewMatrix, modelMatrix, worldViewProjectionMatrix) {
+  render(time, gl, matrices) {
+    const viewProjectionMatrix = m4.multiply(matrices.projection, matrices.view);
     const uniforms = {
-      u_view:                 viewMatrix,
-      u_model:                modelMatrix,
-      u_worldViewProjection:  worldViewProjectionMatrix
+      u_view: matrices.view,
+      u_model: matrices.model,
+      u_worldViewProjection: viewProjectionMatrix
     };
 
     gl.useProgram(this.programInfo.program);
