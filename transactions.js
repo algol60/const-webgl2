@@ -2,10 +2,10 @@ import * as twgl from './resources/4.x/twgl-full.module.js';
 
 const vs = `#version 300 es
 // precision highp float;
-uniform mat4 u_projection;
 uniform mat4 u_worldViewProjection;
-uniform mat4 u_view;
 uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_projection;
 
 in vec3 position; // Triangle vertex.
 in vec3 xyz0; // The start vertex.
@@ -142,8 +142,8 @@ class Transactions {
   render(time, gl, matrices) {
     const viewProjectionMatrix = m4.multiply(matrices.projection, matrices.view);
     const uniforms = {
-      u_view: matrices.view,
       u_model: matrices.model,
+      u_view: matrices.view,
       u_projection: matrices.projection,
       u_worldViewProjection: viewProjectionMatrix
     };

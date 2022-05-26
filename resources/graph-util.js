@@ -18,7 +18,6 @@ const MINIMUM_CAMERA_DISTANCE = 6;
 function sphereBuilder(n) {
   const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
   const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
-  // const DEC_ICONS = ['true', 'false', 'australia', 'china', 'russia', 'ukraine']
   const dectl = textureIndex('true');
   const dectr = textureIndex('false');
   const decbl = textureIndex('ukraine');
@@ -38,7 +37,7 @@ function sphereBuilder(n) {
     tl:dectl
   });
   vxs.push({
-    x:1, y:1, z:0.0, r:1,
+    x:2, y:2, z:0, r:2,
     red:0, gre:1, blue:0,
     fg_tex:textureIndex('hal-9000'), bg_tex:textureIndex('flat_square'),
     tr:dectr

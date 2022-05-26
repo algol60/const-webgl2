@@ -16,8 +16,9 @@ const vec2 TEX_COORDS[] = vec2[](
 );
 
 uniform mat4 u_worldViewProjection;
-uniform mat4 u_view;
 uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_projection;
 
 in vec3 position;
 in vec3 xyz;
@@ -27,15 +28,16 @@ in uvec2 iconsIndex;
 in uvec4 decorIndex;
 
 centroid out vec2 v_fgCoord;
-out vec3 v_color;
+out vec4 v_color;
 flat out uvec2 f_iconsIndex;
 flat out uvec4 f_decorIndex;
+flat out float alpha;
 
 void main() {
   v_fgCoord = TEX_COORDS[gl_VertexID];
-  v_color = color;
+  v_color = vec4(color, 1.0);
 
-  vec4 mposition = u_model * vec4(xyz, 1);
+  vec4 mPosition = u_model * vec4(xyz, 1);
   // position.xy += corners;
 
   // billboarding
@@ -43,9 +45,22 @@ void main() {
   vec3 cameraUp = vec3(u_view[0].y, u_view[1].y, u_view[2].y);
 
   vec2 corners = CORNERS[gl_VertexID] * radius;
-  mposition.xyz += cameraRight * corners.x + cameraUp * corners.y;
+  mPosition.xyz += cameraRight * corners.x + cameraUp * corners.y;
 
-  gl_Position = u_worldViewProjection * mposition;
+  // gl_Position = u_worldViewProjection * mPosition;
+
+  vec4 mvPosition = u_view * mPosition;
+
+  // As a node gets further away from the camera, we want to
+  // fade the foreground and decorator icons so the background color stands out
+  // (because the other icons are too small to see anyway).
+  // (Constellation does something different involving pixelDensity.)
+  //
+  const float FAR_FG_DISTANCE = -100.0; // Distance beyond which fg alpha is 0.0.
+  const float NEAR_FG_DISTANCE = -50.0; // Distance within which fg alpha is 1.0.
+  alpha = smoothstep(FAR_FG_DISTANCE, NEAR_FG_DISTANCE, mvPosition.z/radius);
+
+  gl_Position = u_projection * mvPosition;
 
   f_iconsIndex = iconsIndex;
   f_decorIndex = decorIndex;
@@ -59,6 +74,10 @@ precision highp float;
 //
 const uint NO_ICON = 65535u;
 
+// The minimum icon alpha that will be drawn.
+//
+const float MIN_ALPHA = 0.1;
+
 // The texture atlas contains 8x8 images, each image is 256x256.
 // Same as Constellation, except it uses a 2D texture.
 // (Obviously we need a 3D texture, but this is a proof-of-concept. :-))
@@ -71,9 +90,10 @@ const float TEXTURE_SIZE = 0.125;
 const float HALF_PIXEL = (0.5 / (256.0 * 8.0));
 
 centroid in vec2 v_fgCoord;
-in vec3 v_color;
+in vec4 v_color;
 flat in uvec2 f_iconsIndex;
 flat in uvec4 f_decorIndex;
+flat in float alpha;
 
 uniform sampler2D u_diffuse;
 
@@ -88,9 +108,9 @@ vec2 iconxy(uint ix) {
 
 void main() {
 
-  // Uncomment this to prove that nodes with radius 0.5 just touch each other.
+  // Uncomment this to prove that nodes with radius 1.0 just touch each other.
   //
-  // outColor = vec4(v_color, 1);
+  // outColor = vec4(v_color.rgb, alpha);
   // return;
 
   // We don't get the texture coordinates for each icon.
@@ -105,77 +125,86 @@ void main() {
 
   outColor = vec4(0, 0, 0, 0);
 
-  // Draw the decorators.
-  // It seems counter-intuitive to draw the front part first,
-  // but then we only need to worry about drawing the
-  // background + foreground icons where there isn't any decorator color.
+  // We only draw the foreground and decorator icons if they haven't
+  // been completely faded out.
   //
+  if (alpha>0.0) {
+    // Draw the decorators.
+    // It seems counter-intuitive to draw the front part first,
+    // but then we only need to worry about drawing the
+    // background + foreground icons where there isn't any decorator color.
+    //
 
-  // A decorator takes up 1/3 of the node size.
-  // Therefore we need to re-multiply to get the texture.
-  //
-  const float decoratorRadius = 3.0;
-  const float inv = 1.0 / decoratorRadius;
+    // A decorator takes up 1/3 of the node size.
+    // Therefore we need to re-multiply to get the texture.
+    //
+    const float decoratorRadius = 3.0;
+    const float inv = 1.0 / decoratorRadius;
 
-  uint tl = f_decorIndex[0];
-  uint tr = f_decorIndex[1];
-  uint bl = f_decorIndex[2];
-  uint br = f_decorIndex[3];
+    uint tl = f_decorIndex[0];
+    uint tr = f_decorIndex[1];
+    uint bl = f_decorIndex[2];
+    uint br = f_decorIndex[3];
 
-  if (tl!=NO_ICON && v_fgCoord.x<inv && v_fgCoord.y<inv) {
-    vec2 xy = iconxy(tl);
-    vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * v_fgCoord);
-    if (dColor.a>=0.1) {
-      outColor = dColor;
-    }
-  }
-
-  if (tr!=NO_ICON && v_fgCoord.x>=(1.0-inv) && v_fgCoord.y<inv) {
-    vec2 xy = iconxy(tr);
-    vec2 coord = vec2(v_fgCoord.x-(1.0-inv), v_fgCoord.y);
-    vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
-    if (dColor.a>=0.1) {
-      outColor = dColor;
-    }
-  }
-
-  if (bl!=NO_ICON && v_fgCoord.x<inv && v_fgCoord.y>=(1.0-inv)) {
-    vec2 xy = iconxy(bl);
-    vec2 coord = vec2(v_fgCoord.x, v_fgCoord.y-(1.0-inv));
-    vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
-    if (dColor.a>=0.1) {
-      outColor = dColor;
-    }
-  }
-
-  if (br!=NO_ICON && v_fgCoord.x>=(1.0-inv) && v_fgCoord.y>=(1.0-inv)) {
-    vec2 xy = iconxy(br);
-    vec2 coord = v_fgCoord-(1.0-inv);
-    vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
-    if (dColor.a>=0.1) {
-      outColor = dColor;
-    }
-  }
-
-  // Foreground + background icons.
-  // Start with the foreground icon.
-  // Only use the background icon when the foreground is transparent.
-  //
-  // Only draw where there are no decorators.
-  //
-  if (outColor.a==0.0) {
-    vec4 color = texture(u_diffuse, fgxy + size * v_fgCoord);
-    if (color.a>=0.1) {
-      outColor = color;
-    } else {
-      color = texture(u_diffuse, bgxy + size * v_fgCoord);
-      if (color.a>=0.1) {
-        outColor = color * vec4(v_color, 1);
+    if (tl!=NO_ICON && v_fgCoord.x<inv && v_fgCoord.y<inv) {
+      vec2 xy = iconxy(tl);
+      vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * v_fgCoord);
+      if (dColor.a>=MIN_ALPHA) {
+        outColor = dColor;
       }
     }
+
+    if (tr!=NO_ICON && v_fgCoord.x>=(1.0-inv) && v_fgCoord.y<inv) {
+      vec2 xy = iconxy(tr);
+      vec2 coord = vec2(v_fgCoord.x-(1.0-inv), v_fgCoord.y);
+      vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
+      if (dColor.a>=MIN_ALPHA) {
+        outColor = dColor;
+      }
+    }
+
+    if (bl!=NO_ICON && v_fgCoord.x<inv && v_fgCoord.y>=(1.0-inv)) {
+      vec2 xy = iconxy(bl);
+      vec2 coord = vec2(v_fgCoord.x, v_fgCoord.y-(1.0-inv));
+      vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
+      if (dColor.a>=MIN_ALPHA) {
+        outColor = dColor;
+      }
+    }
+
+    if (br!=NO_ICON && v_fgCoord.x>=(1.0-inv) && v_fgCoord.y>=(1.0-inv)) {
+      vec2 xy = iconxy(br);
+      vec2 coord = v_fgCoord-(1.0-inv);
+      vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
+      if (dColor.a>=MIN_ALPHA) {
+        outColor = dColor;
+      }
+    }
+
+    // If a decorator has already been drawn here,
+    // don't draw the foreground over it.
+    //
+    if (outColor.a==0.0) {
+      vec4 fgColor = texture(u_diffuse, fgxy + size * v_fgCoord);
+      outColor = fgColor;
+    }
+
+    if (alpha==1.0) {
+        if (outColor.a<MIN_ALPHA) {
+          vec4 bgColor = texture(u_diffuse, bgxy + size * v_fgCoord);
+          outColor = bgColor*v_color;
+        }
+    } else {
+      vec4 bgColor = texture(u_diffuse, bgxy + size * v_fgCoord);
+      float a = outColor.a * alpha;
+      outColor = mix(bgColor*v_color, outColor, a);
+    }
+  } else {
+    vec4 bgColor = texture(u_diffuse, bgxy + size * v_fgCoord);
+    outColor = bgColor*v_color;
   }
 
-  if (outColor.a<0.1) {
+  if (outColor.a<MIN_ALPHA) {
     discard;
   }
 }
@@ -256,6 +285,7 @@ class Nodes {
     const uniforms = {
       u_view: matrices.view,
       u_model: matrices.model,
+      u_projection: matrices.projection,
       u_worldViewProjection: viewProjectionMatrix,
       u_diffuse: atlas
     };

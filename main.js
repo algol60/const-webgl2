@@ -51,8 +51,7 @@ function main() {
     yRot: 0.0,
   };
 
-  let cameraMatrix;
-  let viewProjectionMatrix;
+  // let cameraMatrix;
 
   const matrices = {};
 
@@ -60,18 +59,23 @@ function main() {
    * Compute the various matrices.
    * @param {*} copyViewMatrix
    */
-  function updateMatrices() {
+  function updateMatrices(time_d) {
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 
     let modelMatrix = m4.identity();
     modelMatrix = m4.xRotate(modelMatrix, scene.yRot);
     modelMatrix = m4.yRotate(modelMatrix, scene.xRot);
 
+    if (spin) {
+      camera.eye[0] = Math.sin(time_d) * camDist;
+      camera.eye[2] = Math.cos(time_d) * camDist;
+    }
+    const cameraMatrix = m4.lookAt(camera.eye, camera.target, camera.up)
+    // Make a view matrix from the camera matrix.
+    const viewMatrix = m4.inverse(cameraMatrix);
+
     const projectionMatrix =
       m4.perspective(grut.FIELD_OF_VIEW, aspect, grut.CAMERA_NEAR, grut.CAMERA_FAR);
-    // Make a view matrix from the camera matrix.
-    let viewMatrix = m4.inverse(cameraMatrix);
-    viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 
     matrices.model = modelMatrix;
     matrices.view = viewMatrix;
@@ -99,7 +103,7 @@ function main() {
     //
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-    // const pixelDensity = gl.canvas.height * 0.5 / Math.tan(grut.FIELD_OF_VIEW);
+    // const pixelDensity = gl.canvas.clientHeight * 0.5 / Math.tan(grut.FIELD_OF_VIEW);
     // console.log(`pixelDensity=${pixelDensity}`);
 
     gl.enable(gl.DEPTH_TEST);
@@ -110,19 +114,7 @@ function main() {
     // gl.clear(gl.COLOR_BUFFER_BIT);
     // gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
-    // // Compute the projection matrix
-    // const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    // const projectionMatrix =
-    //   m4.perspective(FIELD_OF_VIEW, aspect, CAMERA_NEAR, CAMERA_FAR);
-
-    if (spin) {
-      camera.eye[0] = Math.sin(time_d) * camDist;
-      camera.eye[2] = Math.cos(time_d) * camDist;
-    }
-
-    cameraMatrix = m4.lookAt(camera.eye, camera.target, camera.up)
-
-    updateMatrices();
+    updateMatrices(time_d);
 
     vxs.render(time, gl, matrices, atlas);
 
