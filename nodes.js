@@ -103,21 +103,12 @@ void main() {
   vec2 bgxy = iconxy(f_iconsIndex[1]);
   const vec2 size = vec2(TEXTURE_SIZE, TEXTURE_SIZE) - 2.0*vec2(HALF_PIXEL);
 
-  // Start with the foreground icon.
-  // Only use the background icon when the foreground is transparent.
-  //
   outColor = vec4(0, 0, 0, 0);
-  vec4 color = texture(u_diffuse, fgxy + size * v_fgCoord);
-  if (color.a>=0.1) {
-    outColor = color;
-  } else {
-    color = texture(u_diffuse, bgxy + size * v_fgCoord);
-    if (color.a>=0.1) {
-      outColor = color * vec4(v_color, 1);
-    }
-  }
 
-  // Now do the decorators.
+  // Draw the decorators.
+  // It seems counter-intuitive to draw the front part first,
+  // but then we only need to worry about drawing the
+  // background + foreground icons where there isn't any decorator color.
   //
 
   // A decorator takes up 1/3 of the node size.
@@ -163,6 +154,24 @@ void main() {
     vec4 dColor = texture(u_diffuse, xy + size*decoratorRadius * coord);
     if (dColor.a>=0.1) {
       outColor = dColor;
+    }
+  }
+
+  // Foreground + background icons.
+  // Start with the foreground icon.
+  // Only use the background icon when the foreground is transparent.
+  //
+  // Only draw where there are no decorators.
+  //
+  if (outColor.a==0.0) {
+    vec4 color = texture(u_diffuse, fgxy + size * v_fgCoord);
+    if (color.a>=0.1) {
+      outColor = color;
+    } else {
+      color = texture(u_diffuse, bgxy + size * v_fgCoord);
+      if (color.a>=0.1) {
+        outColor = color * vec4(v_color, 1);
+      }
     }
   }
 
