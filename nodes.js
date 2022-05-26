@@ -26,7 +26,7 @@ in vec3 color;
 in uvec2 iconsIndex;
 in uvec4 decorIndex;
 
-out vec2 v_fgCoord;
+centroid out vec2 v_fgCoord;
 out vec3 v_color;
 flat out uvec2 f_iconsIndex;
 flat out uvec4 f_decorIndex;
@@ -70,7 +70,7 @@ const uint NO_ICON = 65535u;
 const float TEXTURE_SIZE = 0.125;
 const float HALF_PIXEL = (0.5 / (256.0 * 8.0));
 
-in vec2 v_fgCoord;
+centroid in vec2 v_fgCoord;
 in vec3 v_color;
 flat in uvec2 f_iconsIndex;
 flat in uvec4 f_decorIndex;
