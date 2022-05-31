@@ -23,8 +23,9 @@ function sphereBuilder(n) {
   const decbl = textureIndex('ukraine');
   const decbr = textureIndex('china');
 
-  n = Math.max(4, n) - 4;
-  // console.log(`Sphere nodes: ${n}`);
+  // An additional 4 in the centre and 6 at the outer corners.
+  //
+  n = Math.max(6+4, n) - (6+4);
 
   const vxs = [];
 
@@ -55,17 +56,18 @@ function sphereBuilder(n) {
     br:decbr
   });
 
+  // Make the radius dependent on the number of vertices, with a lower limit.
+  //
+  const sphereRadius = 8 + Math.sqrt(n);
+  const NR = 3;
+
   if (n>0) {
-    // ...and the sphere.
+    // ...and the sphere nodes...
     //
     const rnd = 1.0; // Use Math.random() * n to add some randomness.
     const offset = 2.0 / n;
     const increment = Math.PI * (3.0 - Math.sqrt(5));
     const nodeRadius = (ix) => 1;//(ix>3 && (ix%2==0)) ? 2 : 1;
-
-    // Make the radius dependent on the number of vertices, with a lower limit.
-    //
-    const sphereRadius = 8 + Math.sqrt(n);
 
     for (let position=0; position<n; position++) {
       const y = ((position * offset) - 1) + (offset / 2);
@@ -120,11 +122,8 @@ function sphereBuilder(n) {
         if (prevIx!=-1) {
           const c = colorFun(i, len);
           txs.push({
-            vx0: prevIx,
-            vx1: nodeIx,
-            red: c.red,
-            gre: c.gre,
-            blu: c.blu
+            vx0: prevIx, vx1: nodeIx,
+            red: c.red, gre: c.gre, blu: c.blu
           });
         }
         i++;
@@ -132,6 +131,7 @@ function sphereBuilder(n) {
       }
     }
   };
+
   // Connect nodes with the same icon.
   //
   const iconIx = textureIndex('dalek');
@@ -139,6 +139,54 @@ function sphereBuilder(n) {
   connect(textureIndex('hal-9000'), (i,n) =>({red:1, gre:i/n, blu:i/n}));
 
   console.log(`nTx: ${txs.length}`);
+
+  // ... and some specific nodes and transactions.
+  //
+  const V = vxs.length;
+  for (const [x,y,z] of [
+    [-sphereRadius,  sphereRadius,  sphereRadius],
+    [ sphereRadius,  sphereRadius,  sphereRadius],
+    [ sphereRadius, -sphereRadius,  sphereRadius],
+    [-sphereRadius, -sphereRadius, -sphereRadius],
+    [-sphereRadius,  sphereRadius, -sphereRadius],
+    [ sphereRadius,  sphereRadius, -sphereRadius],
+  ]) {
+    vxs.push({
+      x:x, y:y, z:z, r:NR,
+      red:Math.random, gre:Math.random(), blu:Math.random(),
+      fg_tex:textureIndex('hal-9000'), bg_tex:textureIndex('round_circle')
+    });
+  }
+
+  // TODO Make these transactions match Constellation to test transaction merging.
+  //
+  txs.push({
+    vx0:V+0, vx1:V+1,
+    red:1, gre:0, blu:0,
+    w:2
+  });
+  txs.push({
+    vx0:V+1, vx1:V+2,
+    red:0, gre:1, blu:0,
+    w:4
+  });
+  txs.push({
+    vx0:V+3, vx1:V+4,
+    red:0, gre:0, blu:1,
+    w:6
+  });
+  txs.push({
+    vx0:V+4, vx1:V+5,
+    red:1, gre:1, blu:0,
+    w:8
+  });
+  txs.push({
+    vx0:V+1, vx1:V+5,
+    red:1, gre:0, blu:1,
+    w:10
+  });
+
+
 
   return {vxs:vxs, txs:txs};
 }

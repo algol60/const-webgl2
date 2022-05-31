@@ -10,8 +10,10 @@ in float position; // Triangle vertex.
 in vec3 xyz0; // The start vertex.
 in vec3 xyz1; // The end vertex.
 in vec3 color;
+in float width;
 
 out vec3 f_color;
+out vec2 point;
 
 void main() {
 
@@ -53,17 +55,28 @@ void main() {
   //
   offset *= position / 32.0;
 
+  offset *= width;
+
   // A line is built from two triangles; two vertices from one end,
   // and a vertex from the other.
   // We're passing in six position vertices, so we want to use vertices
   // 0,1,5 for the first triangle, and 2,3,4 for the second triangle.
   //
-  vec4 this_xyz = gl_VertexID>=2 && gl_VertexID<5 ? xyz0_ : xyz1_;
+  bool otherEnd = gl_VertexID>=2 && gl_VertexID<5;
+  vec4 this_xyz = otherEnd ? xyz1_ : xyz0_;
   vec4 corner = this_xyz + vec4(offset, 0.0, 0.0);
 
   gl_Position = u_projection * corner;
 
   f_color = color;
+
+  // Pass the xy coordinate of this vertex out.
+  // The coordinates will be interpolated across the line
+  // (in the same way that colors are imterpolated),
+  // allowing the fragment shader to add dark edges and/or line styles.
+  //
+  lineLength = distance(xyz0_, xyz1_);
+  point = vec2(position<0.0?0.0:1.0, otherEnd?lineLength:0.0);
 }
 `;
 
@@ -71,11 +84,19 @@ const fs = `#version 300 es
 precision highp float;
 
 in vec3 f_color;
+in vec2 point;
 
 out vec4 outColor;
 
 void main() {
   outColor = vec4(f_color, 0.75);
+
+  // Darken the edges?
+  //
+  float x = abs(point.x-0.5);
+  if (x>=0.2) {
+    outColor *= 1.2-x;
+  }
 }
 `;
 
@@ -97,12 +118,14 @@ class Transactions {
 
     const xyz2 = [];//new Float32Array(this.n*2*3);
     const color = [];
+    const width = twgl.primitives.createAugmentedTypedArray(txs.length, 1);
     for (const tx of txs) {
       const ni = vxs[tx.vx0];
       const nj = vxs[tx.vx1];
       xyz2.push(ni.x, ni.y, ni.z);
       xyz2.push(nj.x, nj.y, nj.z);
       color.push(tx.red, tx.gre, tx.blu);
+      width.push(tx.hasOwnProperty('w') ? tx.w : 1);
     }
 
     // We're using instancing, so we only need a single instance of
@@ -122,7 +145,8 @@ class Transactions {
       position: {numComponents:1, data:pos                                       },
       xyz0:     {numComponents:3, data:xyz2,  divisor:1, offset:0*4, stride:2*3*4},
       xyz1:     {numComponents:3, data:xyz2,  divisor:1, offset:3*4, stride:2*3*4},
-      color:    {numComponents:3, data:color, divisor:1}
+      color:    {numComponents:3, data:color, divisor:1},
+      width:    {numComponents:1, data:width, divisor:1}
     };
 
     const program = twgl.createProgramFromSources(gl, [vs, fs]);
