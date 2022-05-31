@@ -2,12 +2,11 @@ import * as twgl from './resources/4.x/twgl-full.module.js';
 
 const vs = `#version 300 es
 // precision highp float;
-uniform mat4 u_worldViewProjection;
 uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
 
-in vec3 position; // Triangle vertex.
+in float position; // Triangle vertex.
 in vec3 xyz0; // The start vertex.
 in vec3 xyz1; // The end vertex.
 in vec3 color;
@@ -15,22 +14,18 @@ in vec3 color;
 out vec3 f_color;
 
 void main() {
-  // We're using instancing to draw transactions.
-  // position contains the same vertices, repeated.
-  // vx contains the actual vertices of the transaction triangles.
-  //
-  vec3 vx = position;
+
+  vec4 xyz0_ = u_view * u_model * vec4(xyz0, 1.0);
+  vec4 xyz1_ = u_view * u_model * vec4(xyz1, 1.0);
 
   // The lines currently end at the centre of the 2*2 point sprite.
   // We want to end them on the surface of a 1-radius sphere around the centre,
   // so we subtract 1 from each end of the line.
-  // As the ends of the line approach each other, the ends should shrink towards the centres of the points.
+  // As the ends of the line approach each other, the ends should shrink
+  // towards the centres of the points.
   //
   // arrowLength uses arbitrary numbers to make the shrinking look good.
   //
-
-  vec4 xyz0_ = u_view * u_model * vec4(xyz0, 1.0);
-  vec4 xyz1_ = u_view * u_model * vec4(xyz1, 1.0);
 
   float lineLength = distance(xyz0_, xyz1_);
   vec4 lineDirection = normalize(xyz1_ - xyz0_);
@@ -40,32 +35,33 @@ void main() {
   xyz1_ -= arrowVector;
   xyz0_ += arrowVector;
 
+  // "Billboarding".
+  // Just as the nodes always face the camera, we want to make the lines do the same.
+  // If the line corners are drawn at fixed offsets, then they can be drawn edge on
+  // and disappear.
+  //
+  // Instead, we determine an xy offset that is at right angles to the relative xy
+  // positions of the two nodes. The right angle is obtained using the cross-product
+  // of the xy vector between the two nodes and the unit z-vector. Then normalize
+  // to get a consistent offset.
+  //
+  vec2 offset = normalize(cross(vec3(xyz0_.xy - xyz1_.xy, 0.0), vec3(0.0, 0.0, 1.0))).xy;
+
+  // We use the 1/-1 values passed in as position to make the offset twist
+  // in the correct direction when the nodes are rotated.
+  // We also divide by an arbitrary value to provide the default width of 1.
+  //
+  offset *= position / 32.0;
+
   // A line is built from two triangles; two vertices from one end,
   // and a vertex from the other.
   // We're passing in six position vertices, so we want to use vertices
   // 0,1,5 for the first triangle, and 2,3,4 for the second triangle.
   //
-  vec4 this_xyz = gl_VertexID>=2 && gl_VertexID<5 ? xyz1_ : xyz0_;
-  vec4 mposition = this_xyz + vec4(vx, 0);
+  vec4 this_xyz = gl_VertexID>=2 && gl_VertexID<5 ? xyz0_ : xyz1_;
+  vec4 corner = this_xyz + vec4(offset, 0.0, 0.0);
 
-  // A line is built from two triangles; two vertices from one end,
-  // and a vertex from the other.
-  // We're passing in six position vertices, so we want to use vertices
-  // 0,1,5 for the first triangle, and 2,3,4 for the second triangle.
-  //
-  // vec3 this_xyz = gl_VertexID>=2 && gl_VertexID<5 ? xyz1 : xyz0;
-
-  // vec4 mposition = u_view * u_model * vec4(this_xyz+vx, 1);
-
-  // TODO "billboard" the lines.
-
-  // // billboarding
-  // vec3 cameraRight = vec3(u_view[0].x, u_view[1].x, u_view[2].x);
-  // vec3 cameraUp = vec3(u_view[0].y, u_view[1].y, u_view[2].y);
-  // // vec3 cameraOut = cross(cameraRight, cameraUp);
-  // mposition.xyz += cameraRight * vx.x + cameraUp * vx.y;
-
-  gl_Position = u_projection * mposition;
+  gl_Position = u_projection * corner;
 
   f_color = color;
 }
@@ -111,22 +107,19 @@ class Transactions {
 
     // We're using instancing, so we only need a single instance of
     // three vertices for each of two triangles that make a line.
+    // In fact, we don't even use these values as positions in the shader:
+    // the corners of the line triangles are determined by the
+    // positions of the two end nodes.
+    // We just use these to get the correct number of vertices
+    // (and to make the corner offsets draw correctly).
     //
-    const pos = [
-      0.0, -0.125, 0,
-      0.0,  0.125, 0,
-      0.0,  0.125, 0,
-
-      0.0,  0.125, 0,
-      0.0, -0.125, 0,
-      0.0, -0.125, 0
-    ]
+    const pos = [-1.0, 1.0, 1.0, 1.0, -1.0, -1.0];
 
     // Pass the two ends of each line at the same time to each vertex.
     // We need to know both ends at once to calculate distances and arrowhead sizes.
     //
     const arrays = {
-      position: {numComponents:3, data:pos                                       },
+      position: {numComponents:1, data:pos                                       },
       xyz0:     {numComponents:3, data:xyz2,  divisor:1, offset:0*4, stride:2*3*4},
       xyz1:     {numComponents:3, data:xyz2,  divisor:1, offset:3*4, stride:2*3*4},
       color:    {numComponents:3, data:color, divisor:1}
@@ -144,8 +137,7 @@ class Transactions {
     const uniforms = {
       u_model: matrices.model,
       u_view: matrices.view,
-      u_projection: matrices.projection,
-      u_worldViewProjection: viewProjectionMatrix
+      u_projection: matrices.projection
     };
 
     gl.useProgram(this.programInfo.program);

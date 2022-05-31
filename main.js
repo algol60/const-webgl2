@@ -49,6 +49,13 @@ function main() {
     yMouse: 0.0,
     xRot: 0.0,
     yRot: 0.0,
+
+    drag: false,
+    oldx:0,
+    oldy:0,
+    dx:0, dy:0,
+    theta:0,
+    phi:0
   };
 
   // let cameraMatrix;
@@ -62,9 +69,11 @@ function main() {
   function updateMatrices(time_d) {
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 
-    let modelMatrix = m4.identity();
-    modelMatrix = m4.xRotate(modelMatrix, scene.yRot);
-    modelMatrix = m4.yRotate(modelMatrix, scene.xRot);
+    let modelMatrix = twgl.m4.identity();
+    // modelMatrix = m4.xRotate(modelMatrix, scene.yRot);
+    // modelMatrix = m4.yRotate(modelMatrix, scene.xRot);
+    modelMatrix = twgl.m4.rotateY(modelMatrix, scene.theta);
+    modelMatrix = twgl.m4.rotateX(modelMatrix, scene.phi);
 
     if (spin) {
       camera.eye[0] = Math.sin(time_d) * camDist;
@@ -127,26 +136,42 @@ function main() {
 
   canvas.addEventListener('mousedown', e => {
     e.preventDefault();
-    scene.xMouse = e.offsetX;
-    scene.yMouse = e.offsetY;
-    scene.isDrawing = true;
-    console.log(`x0=${scene.xMouse} y0=${scene.yMouse}`);
+    // scene.xMouse = e.offsetX;
+    // scene.yMouse = e.offsetY;
+    // scene.isDrawing = true;
+    // console.log(`x0=${scene.xMouse} y0=${scene.yMouse}`);
+
+    scene.drag = true;
+    scene.oldx = e.offsetX;
+    scene.oldy = e.offsetY;
+    // return false;
   });
 
   canvas.addEventListener('mouseup', e => {
-    scene.isDrawing = false;
+    // scene.isDrawing = false;
+    scene.drag = false;
   });
 
   canvas.addEventListener('mousemove', e => {
     e.preventDefault();
-    if (scene.isDrawing) {
-      scene.xRot += (e.offsetX - scene.xMouse) / 500;
-      scene.yRot += (e.offsetY - scene.yMouse) / 500;
-      scene.xMouse = e.offsetX;
-      scene.yMouse = e.offsetY;
+    // if (scene.isDrawing) {
+    //   scene.xRot += (e.offsetX - scene.xMouse) / 500;
+    //   scene.yRot += (e.offsetY - scene.yMouse) / 500;
+    //   scene.xMouse = e.offsetX;
+    //   scene.yMouse = e.offsetY;
 
+    //   requestAnimationFrame(drawScene);
+    // }
+
+    if (scene.drag) {
+      scene.dx = (e.offsetX-scene.oldx)*2*Math.PI/canvas.width;
+      scene.dy = (e.offsetY-scene.oldy)*2*Math.PI/canvas.height;
+      scene.theta += scene.dx;
+      scene.phi += scene.dy;
+      scene.oldx = e.offsetX;
+      scene.oldy = e.offsetY;
       requestAnimationFrame(drawScene);
-    }
+  }
   });
 
   canvas.addEventListener('wheel', e => {

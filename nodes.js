@@ -15,7 +15,6 @@ const vec2 TEX_COORDS[] = vec2[](
              vec2(1,1), vec2(0,0), vec2(1,0)
 );
 
-uniform mat4 u_worldViewProjection;
 uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
@@ -38,16 +37,14 @@ void main() {
   v_color = vec4(color, 1.0);
 
   vec4 mPosition = u_model * vec4(xyz, 1);
-  // position.xy += corners;
 
-  // billboarding
+  // Billboarding.
+  //
   vec3 cameraRight = vec3(u_view[0].x, u_view[1].x, u_view[2].x);
   vec3 cameraUp = vec3(u_view[0].y, u_view[1].y, u_view[2].y);
 
   vec2 corners = CORNERS[gl_VertexID] * radius;
   mPosition.xyz += cameraRight * corners.x + cameraUp * corners.y;
-
-  // gl_Position = u_worldViewProjection * mPosition;
 
   vec4 mvPosition = u_view * mPosition;
 
@@ -231,13 +228,6 @@ class Nodes {
     for (const [nodeIx, node] of vxs.entries()) {
       radius.push(node.r);
 
-      // // The texture atlas contains 8x8 images, each image is 256x256.
-      // // Same as Constellation, except it uses a 2D texture.
-      // // Calculate leftx, topy, rightx, bottomy for texcoords.
-      // //
-      // const TEXTURE_SIZE = 0.125;
-      // const HALF_PIXEL = (0.5 / (256 * 8));
-
       // Node foreground icons.
       //
       const fg_tex = node.fg_tex;
@@ -286,7 +276,6 @@ class Nodes {
       u_view: matrices.view,
       u_model: matrices.model,
       u_projection: matrices.projection,
-      u_worldViewProjection: viewProjectionMatrix,
       u_diffuse: atlas
     };
 
