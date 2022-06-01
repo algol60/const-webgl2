@@ -1,7 +1,7 @@
 import * as twgl from './resources/4.x/twgl-full.module.js';
 
 const vs = `#version 300 es
-// precision highp float;
+precision highp float;
 uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
@@ -12,10 +12,19 @@ in vec3 xyz1; // The end vertex.
 in vec3 color;
 in float width;
 
-out vec3 f_color;
+out vec4 frag_color;
 out vec2 point;
 
 void main() {
+  if (position==0.0) {
+    // These are for arrowheads.
+    // We're not there yet.
+    //
+    gl_Position = vec4(0);
+    frag_color = vec4(0.0);
+    point = vec2(0.0);
+    return;
+  }
 
   vec4 xyz0_ = u_view * u_model * vec4(xyz0, 1.0);
   vec4 xyz1_ = u_view * u_model * vec4(xyz1, 1.0);
@@ -55,6 +64,8 @@ void main() {
   //
   offset *= position / 32.0;
 
+  // Multiply by the width from the graph.
+  //
   offset *= width;
 
   // A line is built from two triangles; two vertices from one end,
@@ -68,7 +79,7 @@ void main() {
 
   gl_Position = u_projection * corner;
 
-  f_color = color;
+  frag_color = vec4(color, 1.0);
 
   // Pass the xy coordinate of this vertex out.
   // The coordinates will be interpolated across the line
@@ -83,19 +94,23 @@ void main() {
 const fs = `#version 300 es
 precision highp float;
 
-in vec3 f_color;
+in vec4 frag_color;
 in vec2 point;
 
 out vec4 outColor;
 
 void main() {
-  outColor = vec4(f_color, 0.75);
+  if (frag_color.a==0.0) {
+    discard;
+  } else {
+    outColor = frag_color;
 
-  // Darken the edges?
-  //
-  float x = abs(point.x-0.5);
-  if (x>=0.2) {
-    outColor *= 1.2-x;
+    // Darken the edges?
+    //
+    float x = abs(point.x-0.5);
+    if (x>=0.2) {
+      outColor.rgb *= 1.2-x;
+    }
   }
 }
 `;
@@ -136,7 +151,12 @@ class Transactions {
     // We just use these to get the correct number of vertices
     // (and to make the corner offsets draw correctly).
     //
-    const pos = [-1.0, 1.0, 1.0, 1.0, -1.0, -1.0];
+    const pos = [
+      -1.0,  1.0,  1.0,
+       1.0, -1.0, -1.0,
+       0, 0, 0, // arrowhead
+       0, 0, 0, // arrowhead
+    ];
 
     // Pass the two ends of each line at the same time to each vertex.
     // We need to know both ends at once to calculate distances and arrowhead sizes.

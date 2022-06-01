@@ -70,10 +70,9 @@ function main() {
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 
     let modelMatrix = twgl.m4.identity();
-    // modelMatrix = m4.xRotate(modelMatrix, scene.yRot);
-    // modelMatrix = m4.yRotate(modelMatrix, scene.xRot);
-    modelMatrix = twgl.m4.rotateY(modelMatrix, scene.theta);
-    modelMatrix = twgl.m4.rotateX(modelMatrix, scene.phi);
+
+    modelMatrix = twgl.m4.rotateY(modelMatrix, scene.dx);
+    modelMatrix = twgl.m4.rotateX(modelMatrix, scene.dy);
 
     if (spin) {
       camera.eye[0] = Math.sin(time_d) * camDist;
@@ -83,8 +82,7 @@ function main() {
     // Make a view matrix from the camera matrix.
     const viewMatrix = m4.inverse(cameraMatrix);
 
-    const projectionMatrix =
-      m4.perspective(grut.FIELD_OF_VIEW, aspect, grut.CAMERA_NEAR, grut.CAMERA_FAR);
+    const projectionMatrix = twgl.m4.perspective(grut.FIELD_OF_VIEW, aspect, grut.CAMERA_NEAR, grut.CAMERA_FAR);
 
     matrices.model = modelMatrix;
     matrices.view = viewMatrix;
@@ -135,7 +133,6 @@ function main() {
   }
 
   canvas.addEventListener('mousedown', e => {
-    e.preventDefault();
     // scene.xMouse = e.offsetX;
     // scene.yMouse = e.offsetY;
     // scene.isDrawing = true;
@@ -145,15 +142,16 @@ function main() {
     scene.oldx = e.offsetX;
     scene.oldy = e.offsetY;
     // return false;
+    e.preventDefault();
   });
 
   canvas.addEventListener('mouseup', e => {
     // scene.isDrawing = false;
     scene.drag = false;
+    e.preventDefault();
   });
 
   canvas.addEventListener('mousemove', e => {
-    e.preventDefault();
     // if (scene.isDrawing) {
     //   scene.xRot += (e.offsetX - scene.xMouse) / 500;
     //   scene.yRot += (e.offsetY - scene.yMouse) / 500;
@@ -164,14 +162,16 @@ function main() {
     // }
 
     if (scene.drag) {
-      scene.dx = (e.offsetX-scene.oldx)*2*Math.PI/canvas.width;
-      scene.dy = (e.offsetY-scene.oldy)*2*Math.PI/canvas.height;
-      scene.theta += scene.dx;
-      scene.phi += scene.dy;
+      const dx = (e.offsetX-scene.oldx)*2*Math.PI/canvas.width;
+      const dy = (e.offsetY-scene.oldy)*2*Math.PI/canvas.height;
+      scene.dx += dx;
+      scene.dy += dy;
       scene.oldx = e.offsetX;
       scene.oldy = e.offsetY;
       requestAnimationFrame(drawScene);
-  }
+    }
+
+    e.preventDefault();
   });
 
   canvas.addEventListener('wheel', e => {

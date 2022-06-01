@@ -143,18 +143,19 @@ function sphereBuilder(n) {
   // ... and some specific nodes and transactions.
   //
   const V = vxs.length;
-  for (const [x,y,z] of [
-    [-sphereRadius,  sphereRadius,  sphereRadius],
-    [ sphereRadius,  sphereRadius,  sphereRadius],
-    [ sphereRadius, -sphereRadius,  sphereRadius],
-    [-sphereRadius, -sphereRadius, -sphereRadius],
-    [-sphereRadius,  sphereRadius, -sphereRadius],
-    [ sphereRadius,  sphereRadius, -sphereRadius],
+  const baseTex = textureIndex('australia');
+  for (const [x,y,z,tex] of [
+    [-sphereRadius,  sphereRadius,  sphereRadius, 0],
+    [ sphereRadius,  sphereRadius,  sphereRadius, 1],
+    [ sphereRadius, -sphereRadius,  sphereRadius, 2],
+    [-sphereRadius, -sphereRadius, -sphereRadius, 3],
+    [-sphereRadius,  sphereRadius, -sphereRadius, 4],
+    [ sphereRadius,  sphereRadius, -sphereRadius, 5],
   ]) {
     vxs.push({
       x:x, y:y, z:z, r:NR,
       red:Math.random, gre:Math.random(), blu:Math.random(),
-      fg_tex:textureIndex('hal-9000'), bg_tex:textureIndex('round_circle')
+      fg_tex:baseTex+tex, bg_tex:textureIndex('round_circle')
     });
   }
 
@@ -163,30 +164,34 @@ function sphereBuilder(n) {
   txs.push({
     vx0:V+0, vx1:V+1,
     red:1, gre:0, blu:0,
-    w:2
+    w:32
   });
   txs.push({
     vx0:V+1, vx1:V+2,
     red:0, gre:1, blu:0,
-    w:4
+    w:32
   });
   txs.push({
     vx0:V+3, vx1:V+4,
     red:0, gre:0, blu:1,
-    w:6
+    w:32
   });
   txs.push({
     vx0:V+4, vx1:V+5,
     red:1, gre:1, blu:0,
-    w:8
+    w:32
   });
   txs.push({
     vx0:V+1, vx1:V+5,
-    red:1, gre:0, blu:1,
-    w:10
+    red:1, gre:1, blu:1,
+    w:32
   });
 
-
+  txs.push({
+    vx0:V+0, vx1:V+4,
+    red:1, gre:1, blu:1,
+    w:32
+  })
 
   return {vxs:vxs, txs:txs};
 }
@@ -263,7 +268,7 @@ function convertZoomPointToDirection(canvasW, canvasH, clientX, clientY) {
 
 // These names must match the list of names in make_atlas.py.
 //
-const names = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis', 'australia', 'china', 'russia', 'ukraine', 'check', 'true', 'false',
+const names = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis', 'australia', 'canada', 'new_zealand', 'united_kingdom', 'united_states_of_america', 'china', 'russia', 'ukraine', 'check', 'true', 'false',
 'flat_circle', 'flat_square', 'round_circle', 'round_square', 'transparent'];
 
 function textureIndex(name) {

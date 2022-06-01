@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw
 
 # Update graph-util.js when changing these.
 #
-IMAGES = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis', 'australia', 'china', 'russia', 'ukraine', 'check', 'true', 'false']
+IMAGES = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis', 'australia', 'canada', 'new_zealand', 'united_kingdom', 'united_states_of_america', 'china', 'russia', 'ukraine', 'check', 'true', 'false']
 IMAGES_BG = ['flat_circle', 'flat_square', 'round_circle', 'round_square', 'transparent']
 
 def open_images(image_names):
@@ -18,17 +18,17 @@ def open_images(image_names):
 
     return imgs
 
-def atlas_linear(image_names):
-    imgs = open_images(image_names)
-    atlas = Image.new('RGBA', (256*len(imgs), 256), '#0000')
-    print(atlas)
-    # draw = ImageDraw.Draw(atlas)
-    for i,im in enumerate(imgs):
-        x,y = i*256, 0
-        atlas.paste(im, (x, y))
-        print(f'{i:2} {im} {x:3} {y:3}')
+# def atlas_linear(image_names):
+#     imgs = open_images(image_names)
+#     atlas = Image.new('RGBA', (256*len(imgs), 256), '#0000')
+#     print(atlas)
+#     # draw = ImageDraw.Draw(atlas)
+#     for i,im in enumerate(imgs):
+#         x,y = i*256, 0
+#         atlas.paste(im, (x, y))
+#         print(f'{i:2} {im} {x:3} {y:3}')
 
-    return atlas
+#     return atlas
 
 def atlas_8x8(image_names):
     imgs = open_images(image_names)
