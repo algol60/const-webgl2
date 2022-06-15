@@ -52,6 +52,7 @@ void main() {
   // fade the foreground and decorator icons so the background color stands out
   // (because the other icons are too small to see anyway).
   // (Constellation does something different involving pixelDensity.)
+  // (Check this by changing the FIELD_OF_VIEW angle.)
   //
   const float FAR_FG_DISTANCE = -100.0; // Distance beyond which fg alpha is 0.0.
   const float NEAR_FG_DISTANCE = -50.0; // Distance within which fg alpha is 1.0.

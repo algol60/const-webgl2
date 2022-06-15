@@ -64,7 +64,6 @@ function sphereBuilder(n) {
   // Make the radius dependent on the number of vertices, with a lower limit.
   //
   const sphereRadius = 8 + Math.sqrt(n);
-  const NR = 3;
 
   if (n>0) {
     // ...and the sphere nodes...
@@ -128,7 +127,8 @@ function sphereBuilder(n) {
           const c = colorFun(i, len);
           txs.push({
             vx0: prevIx, vx1: nodeIx,
-            red: c.red, gre: c.gre, blu: c.blu
+            red: c.red, gre: c.gre, blu: c.blu,
+            arrow:1
           });
         }
         i++;
@@ -158,9 +158,9 @@ function sphereBuilder(n) {
     [ sphereRadius,  sphereRadius, -sphereRadius, 5],
   ]) {
     vxs.push({
-      x:x, y:y, z:z, r:NR,
+      x:x, y:y, z:z, r:1, // In Constellation, these are r:3.
       red:Math.random, gre:Math.random(), blu:Math.random(),
-      fg_tex:baseTex+tex, bg_tex:textureIndex('round_circle')
+      fg_tex:baseTex+tex-1, bg_tex:textureIndex('round_circle')
     });
   }
 
@@ -169,33 +169,39 @@ function sphereBuilder(n) {
   txs.push({
     vx0:V+0, vx1:V+1,
     red:1, gre:0, blu:0,
-    w:32
+    w:8,
+    arrow:0
   });
   txs.push({
     vx0:V+1, vx1:V+2,
     red:0, gre:1, blu:0,
-    w:32
+    w:8,
+    arrow:1
   });
   txs.push({
     vx0:V+3, vx1:V+4,
     red:0, gre:0, blu:1,
-    w:32
+    w:8,
+    arrow:2
   });
   txs.push({
     vx0:V+4, vx1:V+5,
     red:1, gre:1, blu:0,
-    w:32
+    w:8,
+    arrow:3
   });
   txs.push({
     vx0:V+1, vx1:V+5,
     red:1, gre:1, blu:1,
-    w:32
+    w:16,
+    arrow:1
   });
 
   txs.push({
     vx0:V+0, vx1:V+4,
     red:1, gre:1, blu:1,
-    w:32
+    w:32,
+    arrow:2
   })
 
   return {vxs:vxs, txs:txs};

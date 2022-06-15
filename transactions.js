@@ -3,6 +3,13 @@ import * as twgl from './resources/4.x/twgl-full.module.js';
 const vs = `#version 300 es
 precision highp float;
 
+// These bits indicate if an arrow head is drawn at either end.
+//
+const uint ARROW_END0 = 1u;
+const uint ARROW_END1 = 2u;
+
+// The length of the arrow head.
+//
 const float ARROW_HEAD_LENGTH = 4.0;
 
 uniform mat4 u_model;
@@ -14,11 +21,18 @@ in vec4 xyz0; // The start vertex.
 in vec4 xyz1; // The end vertex.
 in vec3 color;
 in float width;
+in uint arrow;
 
 out vec4 frag_color;
 out vec2 point;
 
 void main() {
+  // TODO move the tip of the arrow one radius out.
+  //
+
+  bool drawArrow0 = (arrow & ARROW_END0) != 0u;
+  bool drawArrow1 = (arrow & ARROW_END1) != 0u;
+
   vec4 xyz0_vm = u_view * u_model * xyz0;
   vec4 xyz1_vm = u_view * u_model * xyz1;
 
@@ -37,13 +51,20 @@ void main() {
   float arrowLength = (clamp(lineLength, 0.0, 3.0)) * 0.29167;
   vec4 arrowVector = lineDirection * arrowLength;
 
+  // Take arrowheads into account.
+  //
+  float arrow0 = drawArrow0 ? ARROW_HEAD_LENGTH : 1.0;
+  float arrow1 = drawArrow1 ? ARROW_HEAD_LENGTH : 1.0;
+
   // Shrink the ends towards each other.
   //
   // xyz0_ += arrowVector;
   // xyz1_ -= arrowVector;
 
-  vec4 xyz0_ = xyz0_vm + ARROW_HEAD_LENGTH*arrowVector;
-  vec4 xyz1_ = xyz1_vm - ARROW_HEAD_LENGTH*arrowVector;
+  // vec4 xyz0_ = xyz0_vm + ARROW_HEAD_LENGTH*arrowVector;
+  // vec4 xyz1_ = xyz1_vm - ARROW_HEAD_LENGTH*arrowVector;
+  vec4 xyz0_ = xyz0_vm + arrow0 * arrowVector;
+  vec4 xyz1_ = xyz1_vm - arrow1 * arrowVector;
 
   // "Billboarding".
   // Just as the nodes always face the camera, we want to make the lines do the same.
@@ -87,18 +108,26 @@ void main() {
   //
   if (gl_VertexID<6) {
     gl_Position = u_projection * corner;
-    // frag_color = vec4(0.5);
-  } else {
-    // frag_color = vec4(color, 0.5);
-    vec4 arrow = gl_VertexID<9 ? xyz0_vm : xyz1_vm;
+  } else if (drawArrow0 && (gl_VertexID<9) || drawArrow1 && (gl_VertexID>=9)) {
+    // This is either position 6,7,8 (the arrowhead triangle at end0), or
+    // 9,10,11 (the arrowhead triangle at end1).
+    // Figure out the vertices depending on gl_VertexID.
+    // TODO Orient the triangle so the sides darken correctly in the fragment shader.
+    //
+    vec4 arrowPos = gl_VertexID<9 ? xyz0_vm : xyz1_vm;
     float arrowDirection = ARROW_HEAD_LENGTH * (gl_VertexID<9 ? 1.0 : -1.0);
     if (gl_VertexID==6 || gl_VertexID==9) {
-      gl_Position = u_projection * (arrow);
+      gl_Position = u_projection * arrowPos;
     } else if (gl_VertexID==7 || gl_VertexID==10) {
-      gl_Position = u_projection * (arrow + 2.0*vec4(offset, 0.0, 0.0) + arrowDirection*arrowVector);
+      gl_Position = u_projection * (arrowPos + 2.0*vec4(offset, 0.0, 0.0) + arrowDirection*arrowVector);
     } else {
-      gl_Position = u_projection * (arrow - 2.0*vec4(offset, 0.0, 0.0) + arrowDirection*arrowVector);
+      gl_Position = u_projection * (arrowPos - 2.0*vec4(offset, 0.0, 0.0) + arrowDirection*arrowVector);
     }
+  } else {
+    // The extra positions aren't required, because there are no arrowheads.
+    // Setting .a to 0.0 tells the fragment shader code to discard this pixel immediately.
+    //
+    frag_color = vec4(0.0);
   }
 
   // Pass the xy coordinate of this vertex out.
@@ -154,6 +183,7 @@ class Transactions {
     const xyz2 = [];//new Float32Array(this.n*2*3);
     const color = [];
     const width = twgl.primitives.createAugmentedTypedArray(txs.length, 1);
+    const arrow = twgl.primitives.createAugmentedTypedArray(txs.length, 1, Uint8Array);
     for (const tx of txs) {
       const ni = vxs[tx.vx0];
       const nj = vxs[tx.vx1];
@@ -161,6 +191,7 @@ class Transactions {
       xyz2.push(nj.x, nj.y, nj.z);
       color.push(tx.red, tx.gre, tx.blu);
       width.push(tx.hasOwnProperty('w') ? tx.w : 1);
+      arrow.push(tx.hasOwnProperty('arrow') ? tx.arrow : 0);
     }
 
     // We're using instancing, so we only need a single instance of
@@ -186,7 +217,8 @@ class Transactions {
       xyz0:     {numComponents:3, data:xyz2,  divisor:1, offset:0*4, stride:2*3*4},
       xyz1:     {numComponents:3, data:xyz2,  divisor:1, offset:3*4, stride:2*3*4},
       color:    {numComponents:3, data:color, divisor:1},
-      width:    {numComponents:1, data:width, divisor:1}
+      width:    {numComponents:1, data:width, divisor:1},
+      arrow:    {numComponents:1, data:arrow, divisor:1}
     };
 
     const program = twgl.createProgramFromSources(gl, [vs, fs]);
