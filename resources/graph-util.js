@@ -14,6 +14,11 @@ const MINIMUM_CAMERA_DISTANCE = 6;
 /**
  * Generate the coordinates of a sphere.
  * Put four nodes in a square in the middle.
+ *
+ * Note that this is not describing a graph as such,
+ * but is describing what needs to be drawn (although the two look very similar).
+ * For example, this structure describes whether or not to draw arrowheads
+ * on either or both ends of a line, not that a transaction is directed or not.
  */
 function sphereBuilder(n) {
   const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];

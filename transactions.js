@@ -2,13 +2,16 @@ import * as twgl from './resources/4.x/twgl-full.module.js';
 
 const vs = `#version 300 es
 precision highp float;
+
+const float ARROW_HEAD_LENGTH = 4.0;
+
 uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
 
 in float position; // Triangle vertex.
-in vec3 xyz0; // The start vertex.
-in vec3 xyz1; // The end vertex.
+in vec4 xyz0; // The start vertex.
+in vec4 xyz1; // The end vertex.
 in vec3 color;
 in float width;
 
@@ -16,18 +19,8 @@ out vec4 frag_color;
 out vec2 point;
 
 void main() {
-  if (position==0.0) {
-    // These are for arrowheads.
-    // We're not there yet.
-    //
-    gl_Position = vec4(0);
-    frag_color = vec4(0.0);
-    point = vec2(0.0);
-    return;
-  }
-
-  vec4 xyz0_ = u_view * u_model * vec4(xyz0, 1.0);
-  vec4 xyz1_ = u_view * u_model * vec4(xyz1, 1.0);
+  vec4 xyz0_vm = u_view * u_model * xyz0;
+  vec4 xyz1_vm = u_view * u_model * xyz1;
 
   // The lines currently end at the centre of the 2*2 point sprite.
   // We want to end them on the surface of a 1-radius sphere around the centre,
@@ -38,13 +31,19 @@ void main() {
   // arrowLength uses arbitrary numbers to make the shrinking look good.
   //
 
-  float lineLength = distance(xyz0_, xyz1_);
-  vec4 lineDirection = normalize(xyz1_ - xyz0_);
-  float arrowLength = 1.0;// (clamp(lineLength, 0.0, 3.0)) * 0.29167;
+  float lineLength = distance(xyz0_vm, xyz1_vm);
+  vec4 lineDirection = normalize(xyz1_vm - xyz0_vm);
+  // float arrowLength = 1.0;// (clamp(lineLength, 0.0, 3.0)) * 0.29167;
+  float arrowLength = (clamp(lineLength, 0.0, 3.0)) * 0.29167;
   vec4 arrowVector = lineDirection * arrowLength;
 
-  xyz1_ -= arrowVector;
-  xyz0_ += arrowVector;
+  // Shrink the ends towards each other.
+  //
+  // xyz0_ += arrowVector;
+  // xyz1_ -= arrowVector;
+
+  vec4 xyz0_ = xyz0_vm + ARROW_HEAD_LENGTH*arrowVector;
+  vec4 xyz1_ = xyz1_vm - ARROW_HEAD_LENGTH*arrowVector;
 
   // "Billboarding".
   // Just as the nodes always face the camera, we want to make the lines do the same.
@@ -73,13 +72,34 @@ void main() {
   // We're passing in six position vertices, so we want to use vertices
   // 0,1,5 for the first triangle, and 2,3,4 for the second triangle.
   //
-  bool otherEnd = gl_VertexID>=2 && gl_VertexID<5;
+  // bool otherEnd = gl_VertexID>=2 && gl_VertexID<5;
+  // bool otherEnd = (gl_VertexID%6)>=2 && (gl_VertexID%6)<5;
+  bool otherEnd = (gl_VertexID>=2 && gl_VertexID<5) || (gl_VertexID>=8 && gl_VertexID<11);
   vec4 this_xyz = otherEnd ? xyz1_ : xyz0_;
   vec4 corner = this_xyz + vec4(offset, 0.0, 0.0);
 
-  gl_Position = u_projection * corner;
-
   frag_color = vec4(color, 1.0);
+  // float ccc = gl_VertexID>5 ? 1.0 : 0.1;
+  // frag_color = vec4(ccc, ccc, ccc, 1.0);
+
+  // The first six vertices are the two triangles for the line.
+  // The next six are the triangle for the arrowhead at each end of the line.
+  //
+  if (gl_VertexID<6) {
+    gl_Position = u_projection * corner;
+    // frag_color = vec4(0.5);
+  } else {
+    // frag_color = vec4(color, 0.5);
+    vec4 arrow = gl_VertexID<9 ? xyz0_vm : xyz1_vm;
+    float arrowDirection = ARROW_HEAD_LENGTH * (gl_VertexID<9 ? 1.0 : -1.0);
+    if (gl_VertexID==6 || gl_VertexID==9) {
+      gl_Position = u_projection * (arrow);
+    } else if (gl_VertexID==7 || gl_VertexID==10) {
+      gl_Position = u_projection * (arrow + 2.0*vec4(offset, 0.0, 0.0) + arrowDirection*arrowVector);
+    } else {
+      gl_Position = u_projection * (arrow - 2.0*vec4(offset, 0.0, 0.0) + arrowDirection*arrowVector);
+    }
+  }
 
   // Pass the xy coordinate of this vertex out.
   // The coordinates will be interpolated across the line
@@ -152,17 +172,17 @@ class Transactions {
     // (and to make the corner offsets draw correctly).
     //
     const pos = [
-      -1.0,  1.0,  1.0,
-       1.0, -1.0, -1.0,
-       0, 0, 0, // arrowhead
-       0, 0, 0, // arrowhead
+      -1.0,  1.0,  1.0,   // line triangle
+       1.0, -1.0, -1.0,   // line triangle
+      -1.0,  1.0,  1.0,   // arrowhead triangle
+       1.0, -1.0, -1.0    // arrowhead triangle
     ];
 
     // Pass the two ends of each line at the same time to each vertex.
     // We need to know both ends at once to calculate distances and arrowhead sizes.
     //
     const arrays = {
-      position: {numComponents:1, data:pos                                       },
+      position: {numComponents:1, data:pos},
       xyz0:     {numComponents:3, data:xyz2,  divisor:1, offset:0*4, stride:2*3*4},
       xyz1:     {numComponents:3, data:xyz2,  divisor:1, offset:3*4, stride:2*3*4},
       color:    {numComponents:3, data:color, divisor:1},

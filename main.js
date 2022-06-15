@@ -71,8 +71,11 @@ function main() {
 
     let modelMatrix = twgl.m4.identity();
 
-    modelMatrix = twgl.m4.rotateY(modelMatrix, scene.dx);
-    modelMatrix = twgl.m4.rotateX(modelMatrix, scene.dy);
+    // modelMatrix = twgl.m4.rotateY(modelMatrix, scene.dx);
+    // modelMatrix = twgl.m4.rotateX(modelMatrix, scene.dy);
+
+    modelMatrix = twgl.m4.axisRotate(modelMatrix, [0,1,0], scene.dx);
+    modelMatrix = twgl.m4.axisRotate(modelMatrix, [1,0,0], scene.dy);
 
     if (spin) {
       camera.eye[0] = Math.sin(time_d) * camDist;
