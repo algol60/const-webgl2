@@ -47,7 +47,7 @@ void main() {
 
   float lineLength = distance(xyz0_vm, xyz1_vm);
   vec4 lineDirection = normalize(xyz1_vm - xyz0_vm);
-  // float arrowLength = 1.0;// (clamp(lineLength, 0.0, 3.0)) * 0.29167;
+  // float arrowLength = 1.0;
   float arrowLength = (clamp(lineLength, 0.0, 3.0)) * 0.29167;
   vec4 arrowVector = lineDirection * arrowLength;
 
@@ -68,25 +68,25 @@ void main() {
 
   // "Billboarding".
   // Just as the nodes always face the camera, we want to make the lines do the same.
-  // If the line corners are drawn at fixed offsets, then they can be drawn edge on
+  // If the line corners are drawn in fixed directions, then they can be drawn edge on
   // and disappear.
   //
-  // Instead, we determine an xy offset that is at right angles to the relative xy
+  // Instead, we determine an xy direction that is at right angles to the relative xy
   // positions of the two nodes. The right angle is obtained using the cross-product
   // of the xy vector between the two nodes and the unit z-vector. Then normalize
-  // to get a consistent offset.
+  // to get a consistent direction vector.
   //
-  vec2 offset = normalize(cross(vec3(xyz0_.xy - xyz1_.xy, 0.0), vec3(0.0, 0.0, 1.0))).xy;
+  vec2 dir = normalize(cross(vec3(xyz0_.xy - xyz1_.xy, 0.0), vec3(0.0, 0.0, 1.0))).xy;
 
-  // We use the 1/-1 values passed in as position to make the offset twist
+  // We use the 1/-1 values passed in as position to make the direction vector twist
   // in the correct direction when the nodes are rotated.
   // We also divide by an arbitrary value to provide the default width of 1.
   //
-  offset *= position / 32.0;
+  dir *= position / 32.0;
 
   // Multiply by the width from the graph.
   //
-  offset *= width;
+  dir *= width;
 
   // A line is built from two triangles; two vertices from one end,
   // and a vertex from the other.
@@ -95,33 +95,31 @@ void main() {
   //
   // bool otherEnd = gl_VertexID>=2 && gl_VertexID<5;
   // bool otherEnd = (gl_VertexID%6)>=2 && (gl_VertexID%6)<5;
-  bool otherEnd = (gl_VertexID>=2 && gl_VertexID<5) || (gl_VertexID>=8 && gl_VertexID<11);
+  bool otherEnd = (gl_VertexID>=2 && gl_VertexID<5); // || (gl_VertexID>=8 && gl_VertexID<11);
   vec4 this_xyz = otherEnd ? xyz1_ : xyz0_;
-  vec4 corner = this_xyz + vec4(offset, 0.0, 0.0);
+  vec4 corner = this_xyz + vec4(dir, 0.0, 0.0);
 
   frag_color = vec4(color, 1.0);
-  // float ccc = gl_VertexID>5 ? 1.0 : 0.1;
-  // frag_color = vec4(ccc, ccc, ccc, 1.0);
 
   // The first six vertices are the two triangles for the line.
   // The next six are the triangle for the arrowhead at each end of the line.
   //
   if (gl_VertexID<6) {
     gl_Position = u_projection * corner;
-  } else if (drawArrow0 && (gl_VertexID<9) || drawArrow1 && (gl_VertexID>=9)) {
+  } else if ((drawArrow0 && (gl_VertexID<9)) || (drawArrow1 && (gl_VertexID>=9))) {
     // This is either position 6,7,8 (the arrowhead triangle at end0), or
     // 9,10,11 (the arrowhead triangle at end1).
     // Figure out the vertices depending on gl_VertexID.
-    // TODO Orient the triangle so the sides darken correctly in the fragment shader.
+    // TODO Orient the triangle / fix point so the sides darken correctly in the fragment shader.
     //
-    vec4 arrowPos = gl_VertexID<9 ? xyz0_vm : xyz1_vm;
-    float arrowDirection = ARROW_HEAD_LENGTH * (gl_VertexID<9 ? 1.0 : -1.0);
+    float arrowDirection = (ARROW_HEAD_LENGTH-1.0) * (gl_VertexID<9 ? 1.0 : -1.0);
+    vec4 arrowPos = (gl_VertexID<9 ? xyz0_ : xyz1_) - arrowDirection*arrowVector;
     if (gl_VertexID==6 || gl_VertexID==9) {
       gl_Position = u_projection * arrowPos;
     } else if (gl_VertexID==7 || gl_VertexID==10) {
-      gl_Position = u_projection * (arrowPos + 2.0*vec4(offset, 0.0, 0.0) + arrowDirection*arrowVector);
+      gl_Position = u_projection * (arrowPos + 2.0*vec4(dir, 0.0, 0.0) + arrowDirection*arrowVector);
     } else {
-      gl_Position = u_projection * (arrowPos - 2.0*vec4(offset, 0.0, 0.0) + arrowDirection*arrowVector);
+      gl_Position = u_projection * (arrowPos - 2.0*vec4(dir, 0.0, 0.0) + arrowDirection*arrowVector);
     }
   } else {
     // The extra positions aren't required, because there are no arrowheads.
@@ -180,10 +178,11 @@ class Transactions {
     const txs = graph.txs;
     this.n = txs.length;
 
-    const xyz2 = [];//new Float32Array(this.n*2*3);
-    const color = [];
-    const width = twgl.primitives.createAugmentedTypedArray(txs.length, 1);
-    const arrow = twgl.primitives.createAugmentedTypedArray(txs.length, 1, Uint8Array);
+    // const xyz2 = [];//new Float32Array(this.n*2*3);
+    const xyz2 = twgl.primitives.createAugmentedTypedArray(this.n*2*3, 1);
+    const color = twgl.primitives.createAugmentedTypedArray(this.n*3, 1);
+    const width = twgl.primitives.createAugmentedTypedArray(this.n, 1);
+    const arrow = twgl.primitives.createAugmentedTypedArray(this.n, 1, Uint8Array);
     for (const tx of txs) {
       const ni = vxs[tx.vx0];
       const nj = vxs[tx.vx1];
@@ -200,7 +199,7 @@ class Transactions {
     // the corners of the line triangles are determined by the
     // positions of the two end nodes.
     // We just use these to get the correct number of vertices
-    // (and to make the corner offsets draw correctly).
+    // (and to make the corners draw correctly).
     //
     const pos = [
       -1.0,  1.0,  1.0,   // line triangle
