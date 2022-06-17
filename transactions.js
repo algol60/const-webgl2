@@ -3,14 +3,14 @@ import * as twgl from './resources/4.x/twgl-full.module.js';
 const vs = `#version 300 es
 precision highp float;
 
+// An arbitrary value to provide the default line width of 1.
+//
+const float WIDTH_FACTOR = 32.0;
+
 // These bits indicate if an arrow head is drawn at either end.
 //
 const uint ARROW_END0 = 1u;
 const uint ARROW_END1 = 2u;
-
-// The length of the arrow head.
-//
-const float ARROW_HEAD_LENGTH = 4.0;
 
 uniform mat4 u_model;
 uniform mat4 u_view;
@@ -47,24 +47,16 @@ void main() {
 
   float lineLength = distance(xyz0_vm, xyz1_vm);
   vec4 lineDirection = normalize(xyz1_vm - xyz0_vm);
-  // float arrowLength = 1.0;
+
+  // Arbitrary numbers to make the arrowheads look good, even when they shrink.
+  //
   float arrowLength = (clamp(lineLength, 0.0, 3.0)) * 0.29167;
   vec4 arrowVector = lineDirection * arrowLength;
 
-  // Take arrowheads into account.
-  //
-  float arrow0 = drawArrow0 ? ARROW_HEAD_LENGTH : 1.0;
-  float arrow1 = drawArrow1 ? ARROW_HEAD_LENGTH : 1.0;
-
   // Shrink the ends towards each other.
   //
-  // xyz0_ += arrowVector;
-  // xyz1_ -= arrowVector;
-
-  // vec4 xyz0_ = xyz0_vm + ARROW_HEAD_LENGTH*arrowVector;
-  // vec4 xyz1_ = xyz1_vm - ARROW_HEAD_LENGTH*arrowVector;
-  vec4 xyz0_ = xyz0_vm + arrow0 * arrowVector;
-  vec4 xyz1_ = xyz1_vm - arrow1 * arrowVector;
+  vec4 xyz0_ = xyz0_vm + arrowVector;
+  vec4 xyz1_ = xyz1_vm - arrowVector;
 
   // "Billboarding".
   // Just as the nodes always face the camera, we want to make the lines do the same.
@@ -78,11 +70,17 @@ void main() {
   //
   vec2 dir = normalize(cross(vec3(xyz0_.xy - xyz1_.xy, 0.0), vec3(0.0, 0.0, 1.0))).xy;
 
+  // Replicate the Constellation arrowhead drawing.
+  // It's mighty fiddly, but it looks reasonable.
+  //
+  vec4 halfWidth = vec4(dir.xy / WIDTH_FACTOR, 0.0, 0.0) * width;
+  arrowVector *= width * 0.75;
+
   // We use the 1/-1 values passed in as position to make the direction vector twist
   // in the correct direction when the nodes are rotated.
   // We also divide by an arbitrary value to provide the default width of 1.
   //
-  dir *= position / 32.0;
+  dir *= position / WIDTH_FACTOR;
 
   // Multiply by the width from the graph.
   //
@@ -90,19 +88,17 @@ void main() {
 
   // A line is built from two triangles; two vertices from one end,
   // and a vertex from the other.
-  // We're passing in six position vertices, so we want to use vertices
+  // We're passing in six position vertices; we want to use vertices
   // 0,1,5 for the first triangle, and 2,3,4 for the second triangle.
   //
-  // bool otherEnd = gl_VertexID>=2 && gl_VertexID<5;
-  // bool otherEnd = (gl_VertexID%6)>=2 && (gl_VertexID%6)<5;
-  bool otherEnd = (gl_VertexID>=2 && gl_VertexID<5); // || (gl_VertexID>=8 && gl_VertexID<11);
-  vec4 this_xyz = otherEnd ? xyz1_ : xyz0_;
+  bool otherEnd = gl_VertexID>=2 && gl_VertexID<5;
+  vec4 this_xyz = otherEnd ? xyz1_ - arrowVector*(drawArrow1?1.0:0.0) : xyz0_ + arrowVector*(drawArrow0?1.0:0.0);
   vec4 corner = this_xyz + vec4(dir, 0.0, 0.0);
 
   frag_color = vec4(color, 1.0);
 
   // The first six vertices are the two triangles for the line.
-  // The next six are the triangle for the arrowhead at each end of the line.
+  // The next six are one triangle each for the arrowheads at each end of the line.
   //
   if (gl_VertexID<6) {
     gl_Position = u_projection * corner;
@@ -110,16 +106,18 @@ void main() {
     // This is either position 6,7,8 (the arrowhead triangle at end0), or
     // 9,10,11 (the arrowhead triangle at end1).
     // Figure out the vertices depending on gl_VertexID.
-    // TODO Orient the triangle / fix point so the sides darken correctly in the fragment shader.
     //
-    float arrowDirection = (ARROW_HEAD_LENGTH-1.0) * (gl_VertexID<9 ? 1.0 : -1.0);
-    vec4 arrowPos = (gl_VertexID<9 ? xyz0_ : xyz1_) - arrowDirection*arrowVector;
+    // TODO Fix shading.
+    // TODO Double arrow heads.
+    //
+    float arrowDirection = (gl_VertexID<9 ? 1.0 : -1.0);
+    vec4 arrowPos = (gl_VertexID<9 ? xyz0_ : xyz1_);
     if (gl_VertexID==6 || gl_VertexID==9) {
       gl_Position = u_projection * arrowPos;
     } else if (gl_VertexID==7 || gl_VertexID==10) {
-      gl_Position = u_projection * (arrowPos + 2.0*vec4(dir, 0.0, 0.0) + arrowDirection*arrowVector);
+      gl_Position = u_projection * (arrowPos + halfWidth*4.0 + arrowDirection*arrowVector);
     } else {
-      gl_Position = u_projection * (arrowPos - 2.0*vec4(dir, 0.0, 0.0) + arrowDirection*arrowVector);
+      gl_Position = u_projection * (arrowPos - halfWidth*4.0 + arrowDirection*arrowVector);
     }
   } else {
     // The extra positions aren't required, because there are no arrowheads.
@@ -155,7 +153,7 @@ void main() {
     // Darken the edges?
     //
     float x = abs(point.x-0.5);
-    if (x>=0.2) {
+    if (true) {//x>=0.2) {
       outColor.rgb *= 1.2-x;
     }
   }
