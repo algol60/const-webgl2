@@ -12,6 +12,9 @@ const float WIDTH_FACTOR = 32.0;
 const uint ARROW_END0 = 1u;
 const uint ARROW_END1 = 2u;
 
+const int MAX_LINE_POS = 6;
+const int MAX_ARROW0_POS = 12;
+
 uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
@@ -100,25 +103,41 @@ void main() {
   // The first six vertices are the two triangles for the line.
   // The next six are one triangle each for the arrowheads at each end of the line.
   //
-  if (gl_VertexID<6) {
+  if (gl_VertexID<MAX_LINE_POS) {
+
+    // One of the line triangles.
+    //
     gl_Position = u_projection * corner;
-  } else if ((drawArrow0 && (gl_VertexID<9)) || (drawArrow1 && (gl_VertexID>=9))) {
+
+  } else if ((drawArrow0 && (gl_VertexID<MAX_ARROW0_POS)) || (drawArrow1 && (gl_VertexID>=MAX_ARROW0_POS))) {
+
+    // An arrowhead.
+    //
     // This is either position 6,7,8 (the arrowhead triangle at end0), or
     // 9,10,11 (the arrowhead triangle at end1).
     // Figure out the vertices depending on gl_VertexID.
     //
     // TODO Fix shading.
-    // TODO Double arrow heads.
     //
-    float arrowDirection = (gl_VertexID<9 ? 1.0 : -1.0);
-    vec4 arrowPos = (gl_VertexID<9 ? xyz0_ : xyz1_);
-    if (gl_VertexID==6 || gl_VertexID==9) {
+    vec4 arrowPos = gl_VertexID<MAX_ARROW0_POS ? xyz0_ : xyz1_;
+    float arrowDirection = gl_VertexID<MAX_ARROW0_POS ? 1.0 : -1.0;
+    if (position==0.0) {//(gl_VertexID==6 || gl_VertexID==9) {
+      // Arrow tip.
+      //
       gl_Position = u_projection * arrowPos;
-    } else if (gl_VertexID==7 || gl_VertexID==10) {
-      gl_Position = u_projection * (arrowPos + halfWidth*4.0 + arrowDirection*arrowVector);
+    } else if (position==2.0) {//gl_VertexID==7 || gl_VertexID==10) {
+      // Centre bottom of arrow.
+      // If this is a double-arrow line, extend the base to make a diamond.
+      // THis is why the arrows ar edrawn like they are - to make this easy.)
+      //
+      float extend = drawArrow0 && drawArrow1 ? 1.5 : 1.0;
+      gl_Position = u_projection * (arrowPos + extend*arrowDirection*arrowVector);
     } else {
-      gl_Position = u_projection * (arrowPos - halfWidth*4.0 + arrowDirection*arrowVector);
+      // Outside corner.
+      //
+      gl_Position = u_projection * (arrowPos + arrowDirection*arrowVector) + position*halfWidth*4.0;
     }
+
   } else {
     // The extra positions aren't required, because there are no arrowheads.
     // Setting .a to 0.0 tells the fragment shader code to discard this pixel immediately.
@@ -128,7 +147,7 @@ void main() {
 
   // Pass the xy coordinate of this vertex out.
   // The coordinates will be interpolated across the line
-  // (in the same way that colors are imterpolated),
+  // (in the same way that colors are interpolated),
   // allowing the fragment shader to add dark edges and/or line styles.
   //
   lineLength = distance(xyz0_, xyz1_);
@@ -199,11 +218,18 @@ class Transactions {
     // We just use these to get the correct number of vertices
     // (and to make the corners draw correctly).
     //
+    // The arrowhead parts indicate to the shader:
+    // 0: this is the tip
+    // 2: this is the base along the line
+    // -1,1: this is the specified base corner
+    //
     const pos = [
-      -1.0,  1.0,  1.0,   // line triangle
-       1.0, -1.0, -1.0,   // line triangle
-      -1.0,  1.0,  1.0,   // arrowhead triangle
-       1.0, -1.0, -1.0    // arrowhead triangle
+      -1.0,  1.0,  1.0,   // 0  line triangle
+       1.0, -1.0, -1.0,   // 3  line triangle
+         0,    2, -1.0,   // 6  arrowhead semi-triangle at end0
+         0,    2,  1.0,   // 9  arrowhead semi-triangle at end0
+         0,    2, -1.0,   // 12 arrowhead semi-triangle at end1
+         0,    2,  1.0    // 15 arrowhead semi-triangle at end1
     ];
 
     // Pass the two ends of each line at the same time to each vertex.
