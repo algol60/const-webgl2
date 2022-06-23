@@ -12,6 +12,8 @@ const float WIDTH_FACTOR = 32.0;
 const uint ARROW_END0 = 1u;
 const uint ARROW_END1 = 2u;
 
+// The limits of the gl_VertexIDs of the different parts of the lines/arrows.
+//
 const int MAX_LINE_POS = 6;
 const int MAX_ARROW0_POS = 12;
 
@@ -22,11 +24,17 @@ uniform mat4 u_projection;
 in float position; // Triangle vertex.
 in vec4 xyz0; // The start vertex.
 in vec4 xyz1; // The end vertex.
-in vec3 color;
+in vec4 color;
 in float width;
 in uint arrow;
 
 out vec4 frag_color;
+
+// Pass the xy coordinate of this vertex out.
+// The coordinates will be interpolated across the line
+// (in the same way that colors are interpolated),
+// allowing the fragment shader to add dark edges and/or line styles.
+//
 out vec2 point;
 
 void main() {
@@ -89,16 +97,7 @@ void main() {
   //
   dir *= width;
 
-  // A line is built from two triangles; two vertices from one end,
-  // and a vertex from the other.
-  // We're passing in six position vertices; we want to use vertices
-  // 0,1,5 for the first triangle, and 2,3,4 for the second triangle.
-  //
-  bool otherEnd = gl_VertexID>=2 && gl_VertexID<5;
-  vec4 this_xyz = otherEnd ? xyz1_ - arrowVector*(drawArrow1?1.0:0.0) : xyz0_ + arrowVector*(drawArrow0?1.0:0.0);
-  vec4 corner = this_xyz + vec4(dir, 0.0, 0.0);
-
-  frag_color = vec4(color, 1.0);
+  frag_color = color, 1.0;
 
   // The first six vertices are the two triangles for the line.
   // The next six are one triangle each for the arrowheads at each end of the line.
@@ -107,35 +106,66 @@ void main() {
 
     // One of the line triangles.
     //
-    gl_Position = u_projection * corner;
+
+    // A line is built from two triangles; two vertices from one end,
+    // and a vertex from the other.
+    // We're passing in six position vertices; we want to use vertices
+    // 0,1,5 for the first triangle, and 2,3,4 for the second triangle.
+    //
+    bool otherEnd = gl_VertexID>=2 && gl_VertexID<5;
+
+    // Calulate the actual line end points, taking arrows into account.
+    //
+    vec4 xyz0_end;
+    vec4 xyz1_end;
+    vec4 this_xyz;
+    if (otherEnd) {
+      xyz0_end = xyz0_;
+      xyz1_end = xyz1_ - arrowVector*(drawArrow1?1.0:0.0);
+      this_xyz = xyz1_end;
+    } else {
+      xyz0_end = xyz0_ + arrowVector*(drawArrow0?1.0:0.0);
+      xyz1_end - xyz1_;
+      this_xyz = xyz0_end;
+    }
+    vec4 corner = this_xyz + vec4(dir, 0.0, 0.0);
+
+    gl_Position = corner;
+
+    // Redo the lineLength in case it changed due to arrows.
+    // This only matters for non-solid line styles.
+    //
+    lineLength = distance(xyz0_end, xyz1_end);
+    point = vec2(position<0.0?0.0:1.0, otherEnd?lineLength:0.0);
 
   } else if ((drawArrow0 && (gl_VertexID<MAX_ARROW0_POS)) || (drawArrow1 && (gl_VertexID>=MAX_ARROW0_POS))) {
 
     // An arrowhead.
     //
-    // This is either position 6,7,8 (the arrowhead triangle at end0), or
-    // 9,10,11 (the arrowhead triangle at end1).
-    // Figure out the vertices depending on gl_VertexID.
-    //
-    // TODO Fix shading.
+    // This is either position 6,7,8 or 9,10,11 (the arrowhead triangles at end0), or
+    // 12,13,14 or 15,16,17 (the arrowhead triangles at end1).
+    // Figure out the position and direction depending on gl_VertexID.
     //
     vec4 arrowPos = gl_VertexID<MAX_ARROW0_POS ? xyz0_ : xyz1_;
     float arrowDirection = gl_VertexID<MAX_ARROW0_POS ? 1.0 : -1.0;
-    if (position==0.0) {//(gl_VertexID==6 || gl_VertexID==9) {
+    if (position==0.0) {
       // Arrow tip.
       //
-      gl_Position = u_projection * arrowPos;
-    } else if (position==2.0) {//gl_VertexID==7 || gl_VertexID==10) {
+      gl_Position = arrowPos;
+      point = vec2(0.5, 1.0);
+    } else if (position==2.0) {
       // Centre bottom of arrow.
       // If this is a double-arrow line, extend the base to make a diamond.
-      // THis is why the arrows ar edrawn like they are - to make this easy.)
+      // This is why the arrows are drawn like they are - to make this easy.)
       //
       float extend = drawArrow0 && drawArrow1 ? 1.5 : 1.0;
-      gl_Position = u_projection * (arrowPos + extend*arrowDirection*arrowVector);
+      gl_Position = arrowPos + extend*arrowDirection*arrowVector;
+      point = vec2(0.5, 0.0);
     } else {
-      // Outside corner.
+      // Outside bottom corner.
       //
-      gl_Position = u_projection * (arrowPos + arrowDirection*arrowVector) + position*halfWidth*4.0;
+      gl_Position = arrowPos + arrowDirection*arrowVector + position*halfWidth*4.0;
+      point = vec2(-0.35, 0.0);
     }
 
   } else {
@@ -145,13 +175,7 @@ void main() {
     frag_color = vec4(0.0);
   }
 
-  // Pass the xy coordinate of this vertex out.
-  // The coordinates will be interpolated across the line
-  // (in the same way that colors are interpolated),
-  // allowing the fragment shader to add dark edges and/or line styles.
-  //
-  lineLength = distance(xyz0_, xyz1_);
-  point = vec2(position<0.0?0.0:1.0, otherEnd?lineLength:0.0);
+  gl_Position = u_projection * gl_Position;
 }
 `;
 
@@ -172,7 +196,7 @@ void main() {
     // Darken the edges?
     //
     float x = abs(point.x-0.5);
-    if (true) {//x>=0.2) {
+    if (x>=0.2) {
       outColor.rgb *= 1.2-x;
     }
   }
@@ -218,18 +242,22 @@ class Transactions {
     // We just use these to get the correct number of vertices
     // (and to make the corners draw correctly).
     //
+    // Arrowheads are each drawn in two halves:
+    // from the tip to the middle of the base (along the line)
+    // to the base corner. This makes diamonds easy to draw - just extend the base.
+    //
     // The arrowhead parts indicate to the shader:
     // 0: this is the tip
-    // 2: this is the base along the line
+    // 2: this is the middle of the base (along the line)
     // -1,1: this is the specified base corner
     //
     const pos = [
-      -1.0,  1.0,  1.0,   // 0  line triangle
-       1.0, -1.0, -1.0,   // 3  line triangle
-         0,    2, -1.0,   // 6  arrowhead semi-triangle at end0
-         0,    2,  1.0,   // 9  arrowhead semi-triangle at end0
-         0,    2, -1.0,   // 12 arrowhead semi-triangle at end1
-         0,    2,  1.0    // 15 arrowhead semi-triangle at end1
+      -1,  1,  1,   // 0  line triangle
+       1, -1, -1,   // 3  line triangle
+       0,  2, -1,   // 6  arrowhead semi-triangle at end0
+       0,  2,  1,   // 9  arrowhead semi-triangle at end0
+       0,  2, -1,   // 12 arrowhead semi-triangle at end1
+       0,  2,  1    // 15 arrowhead semi-triangle at end1
     ];
 
     // Pass the two ends of each line at the same time to each vertex.
