@@ -51,6 +51,8 @@ function main() {
     yRot: 0.0,
 
     drag: false,
+    prevx: 0,
+    prevy: 0,
     oldx:0,
     oldy:0,
     dx:0, dy:0,
@@ -60,7 +62,26 @@ function main() {
 
   // let cameraMatrix;
 
-  const matrices = {};
+  const matrices = {
+    rotation: twgl.m4.identity()
+  };
+
+  function updateRotation() {
+    // https://stackoverflow.com/questions/37903979/set-an-objects-absolute-rotation-around-the-world-axis?rq=1
+    let rotation = matrices.rotation;
+
+    const worldXAxis = twgl.m4.transformPoint(twgl.m4.inverse(rotation), [1,0,0]);
+    console.log('WXA', worldXAxis);
+    const rotateWorldX = twgl.m4.axisRotate(twgl.m4.identity(), worldXAxis, scene.dy-scene.prevy);
+    rotation = twgl.m4.multiply(rotation, rotateWorldX);
+
+    const worldYAxis = twgl.m4.transformPoint(twgl.m4.inverse(rotation), [0,1,0]);
+    console.log('WYA', worldYAxis);
+    const rotateWorldY = twgl.m4.axisRotate(twgl.m4.identity(), worldYAxis, scene.dx-scene.prevx);
+    rotation = twgl.m4.multiply(rotation, rotateWorldY);
+
+    matrices.rotation = rotation;
+  }
 
   /**
    * Compute the various matrices.
@@ -69,13 +90,7 @@ function main() {
   function updateMatrices(time_d) {
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 
-    let modelMatrix = twgl.m4.identity();
-
-    // modelMatrix = twgl.m4.rotateY(modelMatrix, scene.dx);
-    // modelMatrix = twgl.m4.rotateX(modelMatrix, scene.dy);
-
-    modelMatrix = twgl.m4.axisRotate(modelMatrix, [0,1,0], scene.dx);
-    modelMatrix = twgl.m4.axisRotate(modelMatrix, [1,0,0], scene.dy);
+    const modelMatrix = matrices.rotation;
 
     if (spin) {
       camera.eye[0] = Math.sin(time_d) * camDist;
@@ -167,10 +182,14 @@ function main() {
     if (scene.drag) {
       const dx = (e.offsetX-scene.oldx)*2*Math.PI/canvas.width;
       const dy = (e.offsetY-scene.oldy)*2*Math.PI/canvas.height;
+      scene.prevx = scene.dx;
+      scene.prevy = scene.dy;
       scene.dx += dx;
       scene.dy += dy;
       scene.oldx = e.offsetX;
       scene.oldy = e.offsetY;
+
+      updateRotation();
       requestAnimationFrame(drawScene);
     }
 
