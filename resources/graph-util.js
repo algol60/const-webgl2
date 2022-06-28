@@ -202,6 +202,22 @@ function sphereBuilder(n) {
     arrow:ARROW_HEAD_SRC
   });
 
+  // Multiple lines between two nodes.
+  //
+  const widths = Array(9).fill(1);
+  widths[0] = 2;
+  const lo = lineOffsets(widths);
+  for (const w of widths) {
+    const offset = lo.next().value;
+    console.log('OFFSET', offset);
+    txs.push({
+      vx0:V+3, vx1:V+5,
+      red:0.5, gre:0.5, blu:0.5,
+      w:w, offset:offset,
+      arrow:w==1 ? ARROW_HEAD_DST : ARROW_HEAD_SRC
+    });
+    }
+
   txs.push({
     vx0:V+0, vx1:V+4,
     red:1, gre:1, blu:1,
@@ -291,4 +307,28 @@ function textureIndex(name) {
   return names.indexOf(name);
 }
 
-export {CAMERA_NEAR, CAMERA_FAR, FIELD_OF_VIEW, cameraDistance, convertZoomPointToDirection, degToRad, coordsRadius, sphereBuilder, textureIndex};
+/**
+ * Use this function to generate offsets for multiple lines between two nodes.
+ * We need to know the widths of the lines to produce the correct offsets.
+ */
+function* lineOffsets(widths) {
+  let leftOffset = 0;
+  let rightOffset = 0;
+  let offset = 0;
+  for (const width of widths) {
+    if (leftOffset == 0) {
+        offset = 0;
+        leftOffset += width / 2;
+        rightOffset = leftOffset;
+    } else if (leftOffset < rightOffset) {
+        offset = -(leftOffset + width / 2 + 1);
+        leftOffset += width + 1;
+    } else {
+        offset = rightOffset + width / 2 + 1;
+        rightOffset += width + 1;
+    }
+    yield offset;
+  }
+}
+
+export {CAMERA_NEAR, CAMERA_FAR, FIELD_OF_VIEW, cameraDistance, convertZoomPointToDirection, degToRad, coordsRadius, lineOffsets, sphereBuilder, textureIndex};

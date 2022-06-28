@@ -27,6 +27,7 @@ in vec4 xyz1; // The end vertex.
 in vec4 color;
 in float width;
 in uint arrow;
+in float offset;
 
 out vec4 frag_color;
 
@@ -81,23 +82,31 @@ void main() {
   //
   vec2 dir = normalize(cross(vec3(xyz0_.xy - xyz1_.xy, 0.0), vec3(0.0, 0.0, 1.0))).xy;
 
+  // Divide by an arbitrary value to provide the default width of 1.
+  //
+  dir /= WIDTH_FACTOR;
+
+  // Offset the line so multiple lines between nodes are visible.
+  //
+  xyz0_.xy += 2.0*offset*dir;
+  xyz1_.xy += 2.0*offset*dir;
+
   // Replicate the Constellation arrowhead drawing.
   // It's mighty fiddly, but it looks reasonable.
   //
-  vec4 halfWidth = vec4(dir.xy / WIDTH_FACTOR, 0.0, 0.0) * width;
+  vec4 halfWidth = vec4(dir.xy, 0.0, 0.0) * width;
   arrowVector *= width * 0.75;
 
-  // We use the 1/-1 values passed in as position to make the direction vector twist
-  // in the correct direction when the nodes are rotated.
-  // We also divide by an arbitrary value to provide the default width of 1.
+  // We use the 1/-1 values passed in as position to set the direction of the corners
+  // from the central xyz point at each end.
   //
-  dir *= position / WIDTH_FACTOR;
+  dir *= position;
 
   // Multiply by the width from the graph.
   //
   dir *= width;
 
-  frag_color = color, 1.0;
+  frag_color = color;
 
   // The first six vertices are the two triangles for the line.
   // The next six are one triangle each for the arrowheads at each end of the line.
@@ -224,6 +233,7 @@ class Transactions {
     const color = twgl.primitives.createAugmentedTypedArray(this.n*3, 1);
     const width = twgl.primitives.createAugmentedTypedArray(this.n, 1);
     const arrow = twgl.primitives.createAugmentedTypedArray(this.n, 1, Uint8Array);
+    const offset = twgl.primitives.createAugmentedTypedArray(this.n, 1);
     for (const tx of txs) {
       const ni = vxs[tx.vx0];
       const nj = vxs[tx.vx1];
@@ -232,6 +242,7 @@ class Transactions {
       color.push(tx.red, tx.gre, tx.blu);
       width.push(tx.hasOwnProperty('w') ? tx.w : 1);
       arrow.push(tx.hasOwnProperty('arrow') ? tx.arrow : 0);
+      offset.push(tx.hasOwnProperty('offset') ? tx.offset : 0);
     }
 
     // We're using instancing, so we only need a single instance of
@@ -265,11 +276,12 @@ class Transactions {
     //
     const arrays = {
       position: {numComponents:1, data:pos},
-      xyz0:     {numComponents:3, data:xyz2,  divisor:1, offset:0*4, stride:2*3*4},
-      xyz1:     {numComponents:3, data:xyz2,  divisor:1, offset:3*4, stride:2*3*4},
-      color:    {numComponents:3, data:color, divisor:1},
-      width:    {numComponents:1, data:width, divisor:1},
-      arrow:    {numComponents:1, data:arrow, divisor:1}
+      xyz0:     {numComponents:3, data:xyz2,   divisor:1, offset:0*4, stride:2*3*4},
+      xyz1:     {numComponents:3, data:xyz2,   divisor:1, offset:3*4, stride:2*3*4},
+      color:    {numComponents:3, data:color,  divisor:1},
+      width:    {numComponents:1, data:width,  divisor:1},
+      arrow:    {numComponents:1, data:arrow,  divisor:1},
+      offset:   {numComponents:1, data:offset, divisor:1}
     };
 
     const program = twgl.createProgramFromSources(gl, [vs, fs]);
