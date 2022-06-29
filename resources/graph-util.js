@@ -11,8 +11,17 @@ const CAMERA_FAR = 500000;
 const FIELD_OF_VIEW = degToRad(60);
 const MINIMUM_CAMERA_DISTANCE = 6;
 
+// These bits indicate if an arrow head is drawn at either end.
+//
 const ARROW_HEAD_SRC = 1;
 const ARROW_HEAD_DST = 2;
+
+// Two bits of line styles (shifted by two to avoid arrowhead indicators).
+//
+const LINE_STYLE_SOLID   = 0 << 2;  // Solid.
+const LINE_STYLE_DOTTED  = 1 << 2;  // Evenly spaced on/off.
+const LINE_STYLE_DASHED  = 2 << 2;  // Long on, short off.
+const LINE_STYLE_DIAMOND = 3 << 2;  // Diamonds.
 
 /**
  * Generate the coordinates of a sphere.
@@ -133,7 +142,7 @@ function sphereBuilder(n) {
           txs.push({
             vx0: prevIx, vx1: nodeIx,
             red: c.red, gre: c.gre, blu: c.blu,
-            arrow:1
+            misc:1
           });
         }
         i++;
@@ -175,31 +184,31 @@ function sphereBuilder(n) {
     vx0:V+0, vx1:V+1,
     red:1, gre:0, blu:0,
     w:8,
-    arrow:ARROW_HEAD_SRC
+    misc:ARROW_HEAD_SRC | LINE_STYLE_DASHED
   });
   txs.push({
     vx0:V+1, vx1:V+2,
     red:0, gre:1, blu:0,
     w:8,
-    arrow:ARROW_HEAD_DST
+    misc:ARROW_HEAD_DST
   });
   txs.push({
     vx0:V+3, vx1:V+4,
     red:0, gre:0, blu:1,
     w:8,
-    arrow:ARROW_HEAD_DST
+    misc:ARROW_HEAD_DST
   });
   txs.push({
     vx0:V+4, vx1:V+5,
     red:1, gre:1, blu:0,
     w:8,
-    arrow:ARROW_HEAD_SRC+ARROW_HEAD_DST
+    misc:ARROW_HEAD_SRC | ARROW_HEAD_DST | LINE_STYLE_DIAMOND
   });
   txs.push({
     vx0:V+1, vx1:V+5,
     red:1, gre:1, blu:1,
     w:16,
-    arrow:ARROW_HEAD_SRC
+    misc:ARROW_HEAD_SRC
   });
 
   // Multiple lines between two nodes.
@@ -207,22 +216,27 @@ function sphereBuilder(n) {
   const widths = Array(9).fill(1);
   widths[0] = 2;
   const lo = lineOffsets(widths);
-  for (const w of widths) {
+  const styles = [LINE_STYLE_SOLID, LINE_STYLE_DOTTED, LINE_STYLE_DASHED, LINE_STYLE_DIAMOND];
+  let style = 0;
+  for (const [i, w] of widths.entries()) {
     const offset = lo.next().value;
-    console.log('OFFSET', offset);
     txs.push({
       vx0:V+3, vx1:V+5,
       red:0.5, gre:0.5, blu:0.5,
       w:w, offset:offset,
-      arrow:w==1 ? ARROW_HEAD_DST : ARROW_HEAD_SRC
+      misc:(w==1 ? ARROW_HEAD_DST : ARROW_HEAD_SRC) | styles[style]
     });
+
+    if (i%2==0) {
+      style = (style+1)%4;
     }
+  }
 
   txs.push({
     vx0:V+0, vx1:V+4,
     red:1, gre:1, blu:1,
     w:32,
-    arrow:ARROW_HEAD_DST
+    misc:ARROW_HEAD_DST
   })
 
   return {vxs:vxs, txs:txs};
@@ -309,7 +323,10 @@ function textureIndex(name) {
 
 /**
  * Use this function to generate offsets for multiple lines between two nodes.
- * We need to know the widths of the lines to produce the correct offsets.
+ * We need to know the widths of the lines to produce the correct offsets,
+ * because line widths affect subsequent offsets.
+ *
+ * Offsets start at 0 and alternate wider on either side.
  */
 function* lineOffsets(widths) {
   let leftOffset = 0;

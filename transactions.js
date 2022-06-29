@@ -12,6 +12,14 @@ const float WIDTH_FACTOR = 32.0;
 const uint ARROW_END0 = 1u;
 const uint ARROW_END1 = 2u;
 
+// Two bits of line styles (shifted by two to avoid arrowhead indicators).
+//
+const uint LINE_STYLE_MASK = 3u << 2;
+const uint LINE_STYLE_SOLID = 0u << 2;    // Solid.
+const uint LINE_STYLE_DOTTED = 1u << 2;   // Evenly spaced on/off.
+const uint LINE_STYLE_DASHED = 2u << 2;   // Long on, short off.
+const uint LINE_STYLE_DIAMOND = 3u << 2;  // Diamonds;
+
 // The limits of the gl_VertexIDs of the different parts of the lines/arrows.
 //
 const int MAX_LINE_POS = 6;
@@ -26,13 +34,15 @@ in vec4 xyz0; // The start vertex.
 in vec4 xyz1; // The end vertex.
 in vec4 color;
 in float width;
-in uint arrow;
+in uint misc;
 in float offset;
 
 out vec4 frag_color;
+flat out uint lineStyle;
+flat out float f_lineLength;
 
 // Pass the xy coordinate of this vertex out.
-// The coordinates will be interpolated across the line
+// The coordinates will be interpolated across the trinagle
 // (in the same way that colors are interpolated),
 // allowing the fragment shader to add dark edges and/or line styles.
 //
@@ -42,8 +52,8 @@ void main() {
   // TODO move the tip of the arrow one radius out.
   //
 
-  bool drawArrow0 = (arrow & ARROW_END0) != 0u;
-  bool drawArrow1 = (arrow & ARROW_END1) != 0u;
+  bool drawArrow0 = (misc & ARROW_END0) != 0u;
+  bool drawArrow1 = (misc & ARROW_END1) != 0u;
 
   vec4 xyz0_vm = u_view * u_model * xyz0;
   vec4 xyz1_vm = u_view * u_model * xyz1;
@@ -125,29 +135,24 @@ void main() {
 
     // Calulate the actual line end points, taking arrows into account.
     //
-    vec4 xyz0_end;
-    vec4 xyz1_end;
-    vec4 this_xyz;
-    if (otherEnd) {
-      xyz0_end = xyz0_;
-      xyz1_end = xyz1_ - arrowVector*(drawArrow1?1.0:0.0);
-      this_xyz = xyz1_end;
-    } else {
-      xyz0_end = xyz0_ + arrowVector*(drawArrow0?1.0:0.0);
-      xyz1_end - xyz1_;
-      this_xyz = xyz0_end;
-    }
+    vec4 xyz0_end = xyz0_ + arrowVector*(drawArrow0?1.0:0.0);
+    vec4 xyz1_end = xyz1_ - arrowVector*(drawArrow1?1.0:0.0);
+    vec4 this_xyz = otherEnd ? xyz1_end : xyz0_end;
     vec4 corner = this_xyz + vec4(dir, 0.0, 0.0);
 
+    lineStyle = misc & LINE_STYLE_MASK;
     gl_Position = corner;
 
     // Redo the lineLength in case it changed due to arrows.
     // This only matters for non-solid line styles.
     //
     lineLength = distance(xyz0_end, xyz1_end);
-    point = vec2(position<0.0?0.0:1.0, otherEnd?lineLength:0.0);
+    point = vec2(position*0.5, otherEnd?lineLength:0.0);
+    f_lineLength = lineLength;
 
   } else if ((drawArrow0 && (gl_VertexID<MAX_ARROW0_POS)) || (drawArrow1 && (gl_VertexID>=MAX_ARROW0_POS))) {
+
+    lineStyle = LINE_STYLE_SOLID;
 
     // An arrowhead.
     //
@@ -161,7 +166,7 @@ void main() {
       // Arrow tip.
       //
       gl_Position = arrowPos;
-      point = vec2(0.5, 1.0);
+      point = vec2(0.0, 1.0);
     } else if (position==2.0) {
       // Centre bottom of arrow.
       // If this is a double-arrow line, extend the base to make a diamond.
@@ -169,12 +174,12 @@ void main() {
       //
       float extend = drawArrow0 && drawArrow1 ? 1.5 : 1.0;
       gl_Position = arrowPos + extend*arrowDirection*arrowVector;
-      point = vec2(0.5, 0.0);
+      point = vec2(0.0, 0.0);
     } else {
       // Outside bottom corner.
       //
       gl_Position = arrowPos + arrowDirection*arrowVector + position*halfWidth*4.0;
-      point = vec2(-0.35, 0.0);
+      point = vec2(0.5*arrowDirection, 0.0);
     }
 
   } else {
@@ -191,7 +196,18 @@ void main() {
 const fs = `#version 300 es
 precision highp float;
 
+// Two bits of line styles (shifted by two to avoid arrowhead indicators).
+//
+const uint LINE_STYLE_SOLID   = 0u << 2;  // Solid.
+const uint LINE_STYLE_DOTTED  = 1u << 2;  // Evenly spaced on/off.
+const uint LINE_STYLE_DASHED  = 2u << 2;  // Long on, short off.
+const uint LINE_STYLE_DIAMOND = 3u << 2;  // Diamonds.
+
+const float LINE_DOT_SIZE = 0.3;
+
 in vec4 frag_color;
+flat in float f_lineLength;
+flat in uint lineStyle;
 in vec2 point;
 
 out vec4 outColor;
@@ -200,11 +216,34 @@ void main() {
   if (frag_color.a==0.0) {
     discard;
   } else {
+    if (lineStyle!=LINE_STYLE_SOLID && f_lineLength>0.0) {
+      float segmentSize = LINE_DOT_SIZE * (f_lineLength / (0.25 + f_lineLength));
+
+      if (lineStyle==LINE_STYLE_DOTTED) {
+        float seg = mod(point.y, 2.0*segmentSize);
+        if (seg>(1.0*segmentSize) && seg<(2.0*segmentSize)) {
+          discard;
+        }
+      } else if (lineStyle==LINE_STYLE_DASHED) {
+        float seg = mod(point.y, 3.0*segmentSize);
+        if (seg>(2.0*segmentSize) && seg<(3.0*segmentSize)) {
+          discard;
+        }
+      } else if (lineStyle==LINE_STYLE_DIAMOND) {
+        float seg = mod(point.y, segmentSize) / segmentSize;
+        if ((point.x < 0.0 && seg > point.x + 1.0) || (point.x > 0.0 && seg > (1.0 - point.x))) {
+          discard;
+        } else if((point.x < 0.0 && seg < (1.0 - point.x) - 1.0) || (point.x > 0.0 && seg < point.x)) {
+            discard;
+        }
+      }
+    }
+
     outColor = frag_color;
 
     // Darken the edges?
     //
-    float x = abs(point.x-0.5);
+    float x = abs(point.x);
     if (x>=0.2) {
       outColor.rgb *= 1.2-x;
     }
@@ -232,7 +271,7 @@ class Transactions {
     const xyz2 = twgl.primitives.createAugmentedTypedArray(this.n*2*3, 1);
     const color = twgl.primitives.createAugmentedTypedArray(this.n*3, 1);
     const width = twgl.primitives.createAugmentedTypedArray(this.n, 1);
-    const arrow = twgl.primitives.createAugmentedTypedArray(this.n, 1, Uint8Array);
+    const misc = twgl.primitives.createAugmentedTypedArray(this.n, 1, Uint8Array);
     const offset = twgl.primitives.createAugmentedTypedArray(this.n, 1);
     for (const tx of txs) {
       const ni = vxs[tx.vx0];
@@ -241,7 +280,7 @@ class Transactions {
       xyz2.push(nj.x, nj.y, nj.z);
       color.push(tx.red, tx.gre, tx.blu);
       width.push(tx.hasOwnProperty('w') ? tx.w : 1);
-      arrow.push(tx.hasOwnProperty('arrow') ? tx.arrow : 0);
+      misc.push(tx.hasOwnProperty('misc') ? tx.misc : 0);
       offset.push(tx.hasOwnProperty('offset') ? tx.offset : 0);
     }
 
@@ -259,7 +298,7 @@ class Transactions {
     //
     // The arrowhead parts indicate to the shader:
     // 0: this is the tip
-    // 2: this is the middle of the base (along the line)
+    // 2: this is the middle of the base (along the line) (the value is just a marker)
     // -1,1: this is the specified base corner
     //
     const pos = [
@@ -280,7 +319,7 @@ class Transactions {
       xyz1:     {numComponents:3, data:xyz2,   divisor:1, offset:3*4, stride:2*3*4},
       color:    {numComponents:3, data:color,  divisor:1},
       width:    {numComponents:1, data:width,  divisor:1},
-      arrow:    {numComponents:1, data:arrow,  divisor:1},
+      misc:     {numComponents:1, data:misc,   divisor:1},
       offset:   {numComponents:1, data:offset, divisor:1}
     };
 
