@@ -34,7 +34,7 @@ const LINE_STYLE_DIAMOND = 3 << 2;  // Diamonds.
  * - this structure describes whether or not to draw arrowheads
  *   on either or both ends of a line, not that a transaction is directed or not.
  */
-function sphereBuilder(n) {
+function sphereBuilder(n, rand) {
   const FG_ICONS = ['dalek', 'hal-9000', 'mr_squiggle', 'tardis'];
   const BG_ICONS = ['round_circle', 'flat_square', 'flat_circle', 'round_square', 'transparent'];
   const dectl = textureIndex('true');
@@ -88,11 +88,11 @@ function sphereBuilder(n) {
     const nodeRadius = (ix) => 1;//(ix>3 && (ix%2==0)) ? 2 : 1;
 
     for (let position=0; position<n; position++) {
-      const y = ((position * offset) - 1) + (offset / 2);
+      const y = rand ? Math.random()-0.5 : ((position * offset) - 1) + (offset / 2);
       const r = Math.sqrt(1.0 - Math.pow(y, 2.0));
       const phi = ((position + rnd) % n) * increment;
-      const x = Math.cos(phi) * r;
-      const z = Math.sin(phi) * r;
+      const x = rand ? Math.random()-0.5 : Math.cos(phi) * r;
+      const z = rand ? Math.random()-0.5 : Math.sin(phi) * r;
 
       const red = Math.random();
       const gre = Math.random();
@@ -131,13 +131,15 @@ function sphereBuilder(n) {
   //   lineIxs.push(vx0, vx1);
   // }
 
+  const doLine = (i) => n<1010 || i%32==0;
+
   const connect = (iconIx, colorFun) => {
     let prevIx = -1;
     const len = vxs.filter(vx => vx.fg_tex==iconIx).length - 1;
     let i = 0;
     for (const [nodeIx, node] of vxs.entries()) {
       if (node.fg_tex==iconIx) {
-        if (prevIx!=-1) {
+        if (doLine(i) && prevIx!=-1) {
           const c = colorFun(i, len);
           txs.push({
             vx0: prevIx, vx1: nodeIx,
@@ -173,7 +175,7 @@ function sphereBuilder(n) {
   ]) {
     vxs.push({
       x:x, y:y, z:z, r:1, // In Constellation, these are r:3.
-      red:Math.random, gre:Math.random(), blu:Math.random(),
+      red:Math.random(), gre:Math.random(), blu:Math.random(),
       fg_tex:baseTex+tex, bg_tex:textureIndex('round_circle')
     });
   }
