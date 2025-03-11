@@ -30,7 +30,7 @@ function main() {
 
   // Load the texture; do a redraw when the load is complete.
   //
-  const atlas = textureUtils.loadTexture(gl, 'icons/_atlas.png', () => requestAnimationFrame(drawScene));
+  const atlas = textureUtils.loadTexture(gl, 'icons/atlas.png', () => requestAnimationFrame(drawScene));
 
   // Set up to compute the camera's matrix using lookAt.
   //

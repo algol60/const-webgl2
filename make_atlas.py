@@ -45,4 +45,4 @@ def atlas_8x8(image_names):
 
 # atlas = atlas_linear(IMAGES)
 atlas = atlas_8x8(IMAGES + IMAGES_BG)
-atlas.save('_atlas.png')
+atlas.save('atlas.png')
